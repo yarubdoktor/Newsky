@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#100e19"><title>حلبة العروش | Arena of Prestige</title>
+<style>
+:root{color-scheme:dark;--gold:#e9bd65;--ink:#100e19;--panel:#201b2a;--red:#ef6474;--blue:#62c9ef}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#f8f0df;touch-action:none}
+#app{position:relative;width:100%;height:100%;min-height:420px;background:radial-gradient(ellipse at 50% 42%,#34283b 0,#171421 58%,#0d0b13 100%)}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.top{position:absolute;top:env(safe-area-inset-top,8px);left:10px;right:10px;display:flex;align-items:center;justify-content:space-between;gap:8px;pointer-events:none}
+.brand,.stat,.pill{background:#15121de8;border:1px solid #514235;border-radius:12px;padding:7px 10px;box-shadow:0 5px 18px #0005}
+.brand strong{display:block;color:var(--gold);font-size:12px;letter-spacing:.6px}.brand small{font-size:9px;color:#c7bda9}
+.stats{display:flex;gap:5px}.stat{text-align:center;min-width:58px;padding:6px 8px}.stat b{display:block;font-size:15px;color:var(--gold)}.stat small{font-size:9px;color:#c8bdad}
+#timer{font-size:19px!important;color:#fff!important;font-variant-numeric:tabular-nums}
+.bottom{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);display:flex;align-items:end;justify-content:space-between;padding:0 18px;pointer-events:none}
+#stick{width:112px;height:112px;border-radius:50%;border:2px solid #ffffff40;background:#17131d99;position:relative;pointer-events:auto;touch-action:none;box-shadow:inset 0 0 20px #0007}
+#knob{position:absolute;width:43px;height:43px;left:32px;top:32px;border-radius:50%;background:linear-gradient(#ead6a4,#9d7940);border:2px solid #fff8;box-shadow:0 3px 12px #0008;pointer-events:none}
+.actions{display:flex;gap:10px;align-items:end;pointer-events:auto}
+#attack{width:84px;height:84px;border-radius:50%;border:3px solid #f8d98e;background:radial-gradient(circle at 35% 25%,#dca75b,#6e302d);color:#fff;font-weight:900;font-size:14px;box-shadow:0 0 22px #db8d3a44;touch-action:none}
+#skill{width:62px;height:62px;border-radius:50%;border:2px solid #8fd9f4;background:radial-gradient(circle at 35% 25%,#4d98b8,#26305b);color:#fff;font-weight:800;font-size:11px;touch-action:none}
+#heroPanel{position:absolute;left:10px;right:10px;bottom:145px;display:flex;gap:6px;justify-content:center;pointer-events:auto}
+.hero{border:1px solid #6c5c49;background:#211b28eF;border-radius:10px;padding:7px 9px;color:#e9dfcd;font-size:11px;min-width:65px}
+.hero.active{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset;color:var(--gold)}
+#toast{position:absolute;top:78px;left:50%;transform:translateX(-50%);background:#17131deb;border:1px solid #7b633e;border-radius:12px;padding:8px 13px;font-size:12px;white-space:nowrap;opacity:0;transition:opacity .2s;pointer-events:none}
+#overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:22px;background:#090810d9;backdrop-filter:blur(7px)}
+.card{width:min(420px,100%);border:1px solid #80663c;border-radius:20px;background:linear-gradient(150deg,#292231,#14111c);padding:24px 20px;text-align:center;box-shadow:0 18px 60px #0009}
+.crest{font-size:42px;color:var(--gold);text-shadow:0 0 25px #dba44755}.card h1{font-size:25px;margin:5px 0;color:var(--gold)}.card p{font-size:13px;line-height:1.8;color:#d6cbbb;margin:10px 0 18px}
+.primary{border:0;border-radius:12px;padding:13px 22px;background:linear-gradient(90deg,#9e6b2f,#f1d18a);color:#20150a;font-weight:900;font-size:15px;width:100%}
+.note{font-size:10px!important;color:#9f9484!important;margin-bottom:0!important}
+@media(min-width:700px){#stick{width:130px;height:130px}#knob{left:39px;top:39px}#heroPanel{bottom:155px}.hero{font-size:13px;padding:9px 15px}}
+</style></head>
+<body><main id="app"><canvas id="game"></canvas>
+<div class="top"><div class="brand"><strong>حَلْبَة العُروش</strong><small>ARENA OF PRESTIGE · PROTOTYPE 0.1</small></div><div class="stats"><div class="stat"><b id="timer">03:00</b><small>الوقت</small></div><div class="stat"><b id="score">0 : 0</b><small>الإقصاءات</small></div><div class="stat"><b id="prestige">0</b><small>الهيبة</small></div></div></div>
+<div id="toast"></div>
+<div id="heroPanel"><button class="hero active" data-hero="guardian">🛡️ الحارس</button><button class="hero" data-hero="shadow">🗡️ الظل</button><button class="hero" data-hero="eye">🏹 العين</button><button class="hero" data-hero="sword">⚔️ السيف</button></div>
+<div class="bottom"><div id="stick"><div id="knob"></div></div><div class="actions"><button id="skill">مهارة<br>خاصة</button><button id="attack">هجوم</button></div></div>
+<div id="overlay"><div class="card"><div class="crest">♛</div><h1>حلبة العروش</h1><p>3 ضد 3 · مباراة سريعة · الهيبة تُصنع بالقتال<br>اختر بطلك، قاتل، وسجّل اسمك في الحلبة.</p><button class="primary" id="start">ابدأ المباراة</button><p class="note">نسخة تأسيسية محلية — خصوم تجريبيون، وليست لعبة أونلاين بعد.</p></div></div>
+</main>
+<script>
+(()=>{
+const canvas=document.getElementById('game'),ctx=canvas.getContext('2d'),overlay=document.getElementById('overlay');
+const $=id=>document.getElementById(id);
+const cfg={
+ guardian:{name:'الحارس',hp:160,speed:150,range:68,damage:23,color:'#e3b963',radius:17,desc:'دفاع مرتفع وضربة ثقيلة'},
+ shadow:{name:'الظل',hp:85,speed:218,range:53,damage:32,color:'#bd8df2',radius:13,desc:'سريع وخطر من الخلف'},
+ eye:{name:'العين',hp:90,speed:165,range:190,damage:19,color:'#77d8ef',radius:12,desc:'هجوم بعيد المدى'},
+ sword:{name:'السيف',hp:120,speed:180,range:76,damage:27,color:'#f08b75',radius:15,desc:'ضرر قوي في القتال القريب'}
+};
+let W=0,H=0,dpr=1,last=0,remaining=180,playing=false,over=false,prestige=0,blueKills=0,redKills=0,player=null,entities=[],particles=[],joystick={x:0,y:0},keys={},attackHeld=false,skillHeld=false,attackCd=0,skillCd=0,respawn=0,matchNo=0;
+function resize(){dpr=Math.min(devicePixelRatio||1,2);W=canvas.clientWidth;H=canvas.clientHeight;canvas.width=Math.floor(W*dpr);canvas.height=Math.floor(H*dpr);ctx.setTransform(dpr,0,0,dpr,0,0)}
+new ResizeObserver(resize).observe(canvas);resize();
+function arena(){return {x:W/2,y:H/2+8,r:Math.min(W*.39,H*.31,255)}}
+function spawn(team,hero,idx){let a=arena(),angle=(idx/3)*Math.PI*2+(team===0?Math.PI:0),r=a.r*.68;return {team,hero,...cfg[hero],x:a.x+Math.cos(angle)*r,y:a.y+Math.sin(angle)*r,hp:cfg[hero].hp,maxHp:cfg[hero].hp,alive:true,cd:Math.random()*.5,respawn:0,angle:0,idx}}
+function setup(){entities=[];let heroes=['guardian','shadow','eye','sword'];player=spawn(0,selectedHero,0);player.x=W/2;player.y=H/2+arena().r*.6;entities.push(player);entities.push(spawn(0,heroes[2],1),spawn(0,heroes[3],2));entities.push(spawn(1,heroes[1],0),spawn(1,heroes[0],1),spawn(1,heroes[2],2));remaining=180;blueKills=redKills=0;prestige=0;over=false;updateHud()}
+let selectedHero='guardian';
+function say(t){$('toast').textContent=t;$('toast').style.opacity=1;clearTimeout(say.t);say.t=setTimeout(()=>$('toast').style.opacity=0,1600)}
+function updateHud(){$('timer').textContent=String(Math.floor(remaining/60)).padStart(2,'0')+':'+String(Math.floor(remaining%60)).padStart(2,'0');$('score').textContent=blueKills+' : '+redKills;$('prestige').textContent=prestige}
+function start(){setup();playing=true;overlay.style.display='none';last=performance.now();requestAnimationFrame(loop);say('قاتل بذكاء — كل إقصاء يقربك من الهيبة')}
+function finish(){playing=false;over=true;let win=blueKills>=redKills;overlay.style.display='flex';overlay.querySelector('.card').innerHTML='<div class="crest">'+(win?'♛':'⚔')+'</div><h1>'+(win?'انتصار الحلبة!':'انتهت المباراة')+'</h1><p>النتيجة: '+blueKills+' : '+redKills+'<br>الهيبة المكتسبة: '+prestige+'<br>هذه نتيجة محلية تجريبية، وسيُضاف التقدم الدائم لاحقًا.</p><button class="primary" id="start">إعادة المباراة</button><p class="note">المرحلة الأولى: اختبار الحلقة القتالية الأساسية.</p>';$('start').onclick=start}
+function loop(ts){if(!playing)return;let dt=Math.min((ts-last)/1000,.04);last=ts;remaining-=dt;if(remaining<=0){remaining=0;updateHud();finish();draw();return}update(dt);draw();updateHud();requestAnimationFrame(loop)}
+function nearest(e,enemyOnly=true){let list=entities.filter(t=>t!==e&&t.alive&&(!enemyOnly||t.team!==e.team));list.sort((a,b)=>dist(e,a)-dist(e,b));return list[0]||null}
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
+function hit(attacker,target,amount){target.hp-=amount;for(let i=0;i<5;i++)particles.push({x:target.x,y:target.y,vx:(Math.random()-.5)*100,vy:(Math.random()-.5)*100,life:.3,color:attacker.color});if(target.hp<=0){target.alive=false;target.respawn=target===player?5:4.5;if(attacker.team===0){blueKills++;prestige+=10;say(target.team===1?'إقصاء ناجح +10 هيبة':'');}else redKills++;updateHud()}}
+function attack(e){if(!e.alive||e.cd>0)return;let t=nearest(e);if(!t)return;let d=dist(e,t);if(d>e.range)return;e.cd=e===player?.42:.8;let dmg=e.damage;if(e.hero==='shadow'&&t.hp<t.maxHp*.5)dmg*=1.25;hit(e,t,dmg)}
+function update(dt){attackCd=Math.max(0,attackCd-dt);skillCd=Math.max(0,skillCd-dt);
+for(let e of entities){if(!e.alive){e.respawn-=dt;if(e.respawn<=0){e.alive=true;e.hp=e.maxHp;let a=arena();e.x=a.x+(e.team===0?0:0);e.y=a.y+(e.team===0? a.r*.65:-a.r*.65);if(e.team===0&&e===player)say('عدت إلى الحلبة');}continue}e.cd=Math.max(0,e.cd-dt);
+if(e===player){let dx=joystick.x+(keys.ArrowRight||keys.d?1:0)-(keys.ArrowLeft||keys.a?1:0),dy=joystick.y+(keys.ArrowDown||keys.s?1:0)-(keys.ArrowUp||keys.w?1:0),l=Math.hypot(dx,dy)||1;if(Math.abs(dx)+Math.abs(dy)>.05){e.x+=dx/l*e.speed*dt;e.y+=dy/l*e.speed*dt;e.angle=Math.atan2(dy,dx)}if(attackHeld||keys[' '])attack(e);if(skillHeld&&skillCd<=0){skillCd=7;let a=nearest(e,false);for(let t of entities)if(t.team!==e.team&&t.alive&&dist(e,t)<105)hit(e,t,e.hero==='guardian'?28:18);say('مهارة خاصة!')}}else{let t=nearest(e);if(!t)continue;let d=dist(e,t);if(d>e.range*.78){let dx=(t.x-e.x)/(d||1),dy=(t.y-e.y)/(d||1);e.x+=dx*e.speed*.46*dt;e.y+=dy*e.speed*.46*dt;e.angle=Math.atan2(dy,dx)}else if(e.cd<=0)attack(e)}
+let a=arena(),dx=e.x-a.x,dy=e.y-a.y,d=Math.hypot(dx,dy),max=a.r-18;if(d>max){e.x=a.x+dx/d*max;e.y=a.y+dy/d*max}
+}
+for(let p of particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt}particles=particles.filter(p=>p.life>0)}
+function draw(){ctx.clearRect(0,0,W,H);let a=arena();ctx.fillStyle='#17131e';ctx.fillRect(0,0,W,H);
+ctx.save();ctx.translate(a.x,a.y);
+ctx.beginPath();ctx.arc(0,0,a.r+12,0,Math.PI*2);ctx.fillStyle='#08070c';ctx.fill();
+ctx.beginPath();ctx.arc(0,0,a.r+4,0,Math.PI*2);ctx.fillStyle='#786044';ctx.fill();
+ctx.beginPath();ctx.arc(0,0,a.r,0,Math.PI*2);ctx.fillStyle='#39303c';ctx.fill();ctx.strokeStyle='#bba070';ctx.lineWidth=2;ctx.stroke();
+ctx.beginPath();ctx.arc(0,0,a.r*.72,0,Math.PI*2);ctx.strokeStyle='#655343';ctx.setLineDash([8,9]);ctx.stroke();ctx.setLineDash([]);
+ctx.strokeStyle='#7d6a54';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(-a.r*.9,0);ctx.lineTo(a.r*.9,0);ctx.moveTo(0,-a.r*.9);ctx.lineTo(0,a.r*.9);ctx.stroke();
+ctx.fillStyle='#655746';ctx.fillRect(-25,-20,50,40);ctx.strokeStyle='#b69b6a';ctx.lineWidth=2;ctx.strokeRect(-25,-20,50,40);
+for(let i=0;i<8;i++){let ang=i*Math.PI/4;ctx.beginPath();ctx.arc(Math.cos(ang)*a.r*.86,Math.sin(ang)*a.r*.86,7,0,Math.PI*2);ctx.fillStyle='#aa8d5b';ctx.fill()}
+ctx.restore();
+for(let e of entities){if(!e.alive)continue;ctx.save();ctx.translate(e.x,e.y);ctx.rotate(e.angle||0);
+ctx.globalAlpha=.22;ctx.beginPath();ctx.ellipse(0,5,e.radius*1.5,e.radius*.9,0,0,Math.PI*2);ctx.fillStyle='#000';ctx.fill();ctx.globalAlpha=1;
+ctx.beginPath();ctx.arc(0,0,e.radius+3,0,Math.PI*2);ctx.fillStyle=e.team===0?'#235a73':'#702e42';ctx.fill();
+ctx.beginPath();ctx.arc(0,0,e.radius,0,Math.PI*2);ctx.fillStyle=e.color;ctx.fill();
+ctx.strokeStyle='#fff9';ctx.lineWidth=2;ctx.stroke();
+ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(e.range>100?e.radius+13:e.radius+22,0);ctx.strokeStyle=e.color;ctx.lineWidth=e.hero==='guardian'?5:3;ctx.stroke();
+ctx.restore();
+ctx.fillStyle='#130e18';ctx.fillRect(e.x-20,e.y-e.radius-13,40,5);ctx.fillStyle=e.team===0?'#62c9ef':'#ef6474';ctx.fillRect(e.x-20,e.y-e.radius-13,40*Math.max(0,e.hp/e.maxHp),5);
+if(e===player){ctx.fillStyle='#fff';ctx.font='bold 10px system-ui';ctx.textAlign='center';ctx.fillText('أنت',e.x,e.y-e.radius-18)}}
+for(let p of particles){ctx.globalAlpha=Math.max(0,p.life/.3);ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,3,0,Math.PI*2);ctx.fill()}ctx.globalAlpha=1;
+}
+$('start').onclick=start;
+document.querySelectorAll('.hero').forEach(b=>b.addEventListener('click',()=>{if(playing)return;selectedHero=b.dataset.hero;document.querySelectorAll('.hero').forEach(x=>x.classList.toggle('active',x===b));say(cfg[selectedHero].name+' — '+cfg[selectedHero].desc)}));
+$('attack').addEventListener('pointerdown',e=>{e.preventDefault();attackHeld=true;$('attack').setPointerCapture(e.pointerId)});['pointerup','pointercancel','lostpointercapture'].forEach(ev=>$('attack').addEventListener(ev,()=>attackHeld=false));
+$('skill').addEventListener('pointerdown',e=>{e.preventDefault();skillHeld=true;$('skill').setPointerCapture(e.pointerId)});['pointerup','pointercancel','lostpointercapture'].forEach(ev=>$('skill').addEventListener(ev,()=>skillHeld=false));
+window.addEventListener('keydown',e=>{keys[e.key]=true;if([' ','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key))e.preventDefault()});window.addEventListener('keyup',e=>keys[e.key]=false);
+const stick=$('stick'),knob=$('knob');let stickId=null,center={x:0,y:0};
+stick.addEventListener('pointerdown',e=>{e.preventDefault();stickId=e.pointerId;stick.setPointerCapture(stickId);let r=stick.getBoundingClientRect();center={x:r.left+r.width/2,y:r.top+r.height/2};moveStick(e)});
+stick.addEventListener('pointermove',e=>{if(e.pointerId===stickId)moveStick(e)});
+function moveStick(e){let dx=e.clientX-center.x,dy=e.clientY-center.y,m=34,l=Math.hypot(dx,dy)||1;if(l>m){dx=dx/l*m;dy=dy/l*m}joystick={x:dx/m,y:dy/m};knob.style.left=(32+dx)+'px';knob.style.top=(32+dy)+'px'}
+function resetStick(){stickId=null;joystick={x:0,y:0};knob.style.left='32px';knob.style.top='32px'}
+['pointerup','pointercancel','lostpointercapture'].forEach(ev=>stick.addEventListener(ev,resetStick));
+})();
+</script></body></html>
