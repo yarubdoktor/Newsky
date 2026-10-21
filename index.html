@@ -90,7 +90,7 @@ ctx.fillStyle='#130e18';ctx.fillRect(e.x-20,e.y-e.radius-13,40,5);ctx.fillStyle=
 if(e===player){ctx.fillStyle='#fff';ctx.font='bold 10px system-ui';ctx.textAlign='center';ctx.fillText('أنت',e.x,e.y-e.radius-18)}}
 for(let p of particles){ctx.globalAlpha=Math.max(0,p.life/.3);ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,3,0,Math.PI*2);ctx.fill()}ctx.globalAlpha=1;
 }
-$('start').onclick=start;
+overlay.addEventListener('click',e=>{if(e.target&&e.target.id==='start')start()});
 document.querySelectorAll('.hero').forEach(b=>b.addEventListener('click',()=>{if(playing)return;selectedHero=b.dataset.hero;document.querySelectorAll('.hero').forEach(x=>x.classList.toggle('active',x===b));say(cfg[selectedHero].name+' — '+cfg[selectedHero].desc)}));
 $('attack').addEventListener('pointerdown',e=>{e.preventDefault();attackHeld=true;$('attack').setPointerCapture(e.pointerId)});['pointerup','pointercancel','lostpointercapture'].forEach(ev=>$('attack').addEventListener(ev,()=>attackHeld=false));
 $('skill').addEventListener('pointerdown',e=>{e.preventDefault();skillHeld=true;$('skill').setPointerCapture(e.pointerId)});['pointerup','pointercancel','lostpointercapture'].forEach(ev=>$('skill').addEventListener(ev,()=>skillHeld=false));
