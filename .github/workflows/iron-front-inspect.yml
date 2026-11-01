@@ -1,4 +1,4 @@
-name: Inspect IRON FRONT Android package
+name: Build IRON FRONT APK
 on:
   push:
     paths:
@@ -6,23 +6,50 @@ on:
       - 'IRON-FRONT-0.4-Ready.zip'
   workflow_dispatch:
 jobs:
-  inspect:
+  build-android:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Inspect project archive
-        shell: bash
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: /tmp/iron-front/IRON-FRONT-0.4/SOURCE/package-lock.json
+      - name: Extract IRON FRONT source
         run: |
-          set -e
-          test -f "IRON-FRONT-0.4-Ready.zip"
           mkdir -p /tmp/iron-front
           unzip -q "IRON-FRONT-0.4-Ready.zip" -d /tmp/iron-front
-          echo "=== PROJECT FILES (first 250) ==="
-          find /tmp/iron-front -maxdepth 5 -type f | sed 's#^/tmp/iron-front/##' | head -250
-          echo "=== BUILD ENTRYPOINTS ==="
-          find /tmp/iron-front -type f \( -name package.json -o -name capacitor.config.ts -o -name capacitor.config.json -o -name settings.gradle -o -name build.gradle -o -name gradlew -o -name AndroidManifest.xml -o -name index.html -o -name vite.config.ts -o -name next.config.js -o -name next.config.mjs \) -print
-          echo "=== PACKAGE METADATA ==="
-          while IFS= read -r f; do
-            echo "--- $f"
-            sed -n '1,220p' "$f"
-          done < <(find /tmp/iron-front -name package.json -type f | head -10)
+          echo "PROJECT_DIR=$RUNNER_TEMP/iron-front/IRON-FRONT-0.4/SOURCE" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/iron-front"
+          cp -a /tmp/iron-front/IRON-FRONT-0.4 "$RUNNER_TEMP/iron-front/"
+      - name: Install web dependencies and build
+        working-directory: ${{ runner.temp }}/iron-front/IRON-FRONT-0.4/SOURCE
+        run: |
+          npm ci
+          npm run build
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Package web game as Android app
+        working-directory: ${{ runner.temp }}/iron-front/IRON-FRONT-0.4/SOURCE
+        run: |
+          npm install @capacitor/core @capacitor/cli @capacitor/android
+          npx cap init "IRON FRONT" "com.yarubdoktor.ironfront" --web-dir dist
+          npx cap add android
+          npx cap sync android
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: IRON-FRONT-0.4-Android-APK
+          path: ${{ runner.temp }}/iron-front/IRON-FRONT-0.4/SOURCE/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
