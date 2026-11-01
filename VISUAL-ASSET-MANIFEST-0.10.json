@@ -53,7 +53,14 @@
     "rockVariants": 4,
     "mineModelVariants": 1,
     "centralDepotPropFamily": 1,
-    "rallyMarkerFamily": 1
+    "rallyMarkerFamily": 1,
+    "mountainBlockerPieces": 4,
+    "decorativeMountainInstances": 34,
+    "treeInstances": 110,
+    "rockInstances": 8,
+    "minePlacements": 2,
+    "captureZones": 3,
+    "cornerTowerPlacements": 8
   },
   "effects": [
     "small-arms-muzzle-tracer",
