@@ -141,18 +141,18 @@ jobs:
           test -s "$APK"
           ls -lh "$APK"
           cp "$APK" "$RUNNER_TEMP/IRON-FRONT-0.14-BATTLEFIELD-TEST.apk"
-          test -s "$RUNNER_TEMP/IRON-FRONT-0.13-WORLD-TEST.apk"
+          test -s "$RUNNER_TEMP/IRON-FRONT-0.14-BATTLEFIELD-TEST.apk"
       - name: Upload 0.14 battlefield immersion test APK
         uses: actions/upload-artifact@v4
         with:
           name: IRON-FRONT-0.14-BATTLEFIELD-APK
-          path: ${{ runner.temp }}/IRON-FRONT-0.13-WORLD-TEST.apk
+          path: ${{ runner.temp }}/IRON-FRONT-0.14-BATTLEFIELD-TEST.apk
           if-no-files-found: error
           retention-days: 14
       - name: Upload 0.14 source archive with all models
         uses: actions/upload-artifact@v4
         with:
-          name: IRON-FRONT-0.13-WORLD-SOURCE
-          path: ${{ runner.temp }}/IRON-FRONT-0.13-WORLD-SOURCE.zip
+          name: IRON-FRONT-0.14-BATTLEFIELD-SOURCE
+          path: ${{ runner.temp }}/IRON-FRONT-0.14-BATTLEFIELD-SOURCE.zip
           if-no-files-found: error
           retention-days: 14
