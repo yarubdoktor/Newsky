@@ -1,0 +1,126 @@
+--- a/src/game/combatSystem.ts
++++ b/src/game/combatSystem.ts
+@@ -81,6 +81,9 @@
+   let engaged=false;
+   let enemyResources={...state.opponent.resources};
+   const damage=new Map<number,number>(),buildingDamage=new Map<string,number>();
++  // Remember which hostile unit actually hit each unit so defenders retaliate against
++  // the attacker, rather than charging the enemy HQ or picking an unrelated target.
++  const retaliationTargets=new Map<number,number>();
+   const buildingsOf=(faction:'player'|'enemy')=>faction==='player'?state.opponent.buildings:state.buildings;
+   // Stale building targets are cleared the tick after that structure is destroyed.
+   units=units.map(unit=>{
+@@ -139,12 +142,16 @@
+     else enemyResources={...enemyResources,ammo:resources.ammo-ammoCost};
+     const technologies=unit.faction==='player'?state.technologies:state.opponent.technologies;
+     const opponentTech=unit.faction==='player'?state.opponent.technologies:state.technologies;
+-    const armor='armor' in target?target.armor+opponentTech.armor*5:0;
++    const targetUnit='id' in target?units.find(v=>v.id===Number(target.id)):undefined;
++    const armor=targetUnit?targetUnit.armor+opponentTech.armor*5:0;
+     const penetration=unit.kind==='antitank'?armor*.8:0;
+-    const cover=state.biome==='forest'&&'kind' in target&&['infantry','sniper','engineer','antitank'].includes(target.kind)?.85:1;
++    const cover=state.biome==='forest'&&targetUnit&&['infantry','sniper','engineer','antitank'].includes(targetUnit.kind)?.85:1;
+     const accuracy=1-.18*Math.min(1,distance(unit,target)/unit.range);
+     const hit=Math.max(2,unit.damage*(1+technologies.weapons*.3)-armor+penetration)*cover*accuracy;
+-    if('id' in target&&typeof target.id==='number')damage.set(target.id,(damage.get(target.id)??0)+hit);
++    if(targetUnit){
++      damage.set(targetUnit.id,(damage.get(targetUnit.id)??0)+hit);
++      if(targetUnit.faction!==unit.faction)retaliationTargets.set(targetUnit.id,unit.id);
++    }
+     else if('id' in target&&typeof target.id==='string')buildingDamage.set(target.id,(buildingDamage.get(target.id)??0)+hit*.3);
+     else if(unit.faction==='player')enemyHp=Math.max(0,enemyHp-hit*.12);
+     else baseHp=Math.max(0,baseHp-hit*.12);
+@@ -176,6 +183,17 @@
+       .some(b=>b.kind==='hospital'&&b.status==='active'&&distance(b,u)<13);
+     return {...u,hp:Math.max(0,Math.min(u.maxHp,u.hp-(damage.get(u.id)??0)+(hospital&&!damage.has(u.id)?3*dt:0)))};
+   });
++  // Player units that were hit automatically engage the specific hostile attacker.
++  // This is a unit-to-unit response only: it never creates an HQ/building attack order.
++  units=units.map(u=>{
++    if(u.faction!=='player'||u.hp<=0)return u;
++    const attackerId=retaliationTargets.get(u.id);
++    if(attackerId===undefined)return u;
++    const attacker=units.find(v=>v.id===attackerId&&v.faction==='enemy'&&v.hp>0);
++    if(!attacker)return u;
++    return {...u,order:'attack' as const,targetId:attacker.id,targetBld:null,
++      targetX:attacker.x,targetZ:attacker.z,path:[]};
++  });
+   const kills=units.filter(u=>u.hp<=0&&u.faction==='enemy').length;
+   const losses=units.filter(u=>u.hp<=0&&u.faction==='player').length;
+   const updateBuildings=(buildings:GameState['buildings'],hq:number)=>buildings.map(b=>({...b,
+--- a/src/game/FortressScene.tsx
++++ b/src/game/FortressScene.tsx
+@@ -288,7 +288,17 @@
+       </group>)}
+       {state.shots.map(shot=><group key={shot.id}>
+         <Line points={[[shot.x,.85,shot.z],[shot.toX,.7,shot.toZ]]} color={shot.faction==='player'?'#ffe5a0':'#ffac80'} lineWidth={1.5}/>
+-        <mesh position={[shot.toX,.7,shot.toZ]}><sphereGeometry args={[.25,6,6]}/><meshBasicMaterial color="#ffd293"/></mesh>
++        {/* Brief muzzle flash and expanding impact ring make each hit readable on mobile. */}
++        <mesh position={[shot.x,.85,shot.z]}><sphereGeometry args={[.11,6,6]}/>
++          <meshBasicMaterial color={shot.faction==='player'?'#fff0b5':'#ffc0a0'}/></mesh>
++        <mesh position={[shot.toX,.72,shot.toZ]}><sphereGeometry args={[.2,8,6]}/>
++          <meshBasicMaterial color="#ffd293"/></mesh>
++        <mesh position={[shot.toX,.075,shot.toZ]} rotation={[-Math.PI/2,0,0]}
++          scale={1+(0.22-shot.life)*5}>
++          <ringGeometry args={[.16,.28,16]}/>
++          <meshBasicMaterial color={shot.faction==='player'?'#ffe5a0':'#ffac80'} transparent
++            opacity={Math.max(0,shot.life/.22)*.8} depthWrite={false}/>
++        </mesh>
+       </group>)}
+       <Weather state={state} paused={paused}/><AutoCamera/><PerformanceMeter/><CameraCapture cameraRef={cameraRef}/>
+       {onCameraMove&&<CameraLink onCameraMove={onCameraMove}/>}
+--- a/tests/simulation.test.ts
++++ b/tests/simulation.test.ts
+@@ -347,3 +347,52 @@
+   const pool=state.mines[0].steel+state.mines[0].fuel+state.mines[0].power+state.mines[0].ammo;
+   assert(pool<17500);
+ });
++
++test('player units automatically retaliate against the specific enemy unit that hits them',()=>{
++  let state=isolated();
++  const defender=makeUnit(1,'infantry','player',0,0);
++  const attacker=makeUnit(101,'tank','enemy',4.5,0);
++  state.units=[defender,attacker];
++  const friendlyBase=state.baseHp,hostileBase=state.enemyHp;
++  state=advanceCombat(state,.1);
++  const returned=state.units.find(u=>u.id===1)!;
++  assert.equal(returned.order,'attack');
++  assert.equal(returned.targetId,101);
++  assert.equal(returned.targetBld??null,null);
++  assert.equal(state.baseHp,friendlyBase);
++  assert.equal(state.enemyHp,hostileBase);
++  const before=returned.x;
++  state=advanceCombat(state,.1);
++  assert(state.units.find(u=>u.id===1)!.x>before,'defender should close distance to the attacker');
++});
++
++test('being attacked does not make idle units march toward the enemy HQ',()=>{
++  let state=isolated();
++  state.units=[makeUnit(1,'infantry','player',0,0),makeUnit(101,'tank','enemy',4.5,0)];
++  state=advanceCombat(state,.1);
++  const defender=state.units.find(u=>u.id===1)!;
++  assert.equal(defender.targetId,101);
++  assert.notEqual(defender.targetId,-1);
++  assert.equal(defender.targetBld??null,null);
++});
++
++test('automatic fire chooses the nearest visible hostile unit inside weapon range',()=>{
++  let state=isolated();
++  const shooter=makeUnit(1,'infantry','player',0,0);
++  const nearest={...makeUnit(101,'infantry','enemy',2.5,0),cooldown:1};
++  const farther={...makeUnit(102,'infantry','enemy',3.4,0),cooldown:1};
++  state.units=[shooter,farther,nearest];
++  state=advanceCombat(state,.1);
++  assert(state.units.find(u=>u.id===101)!.hp<nearest.hp);
++  assert.equal(state.units.find(u=>u.id===102)!.hp,farther.hp);
++  assert(state.shots.some(s=>s.faction==='player'&&s.toX===nearest.x));
++});
++
++test('unit damage resolves into removal and kill credit with a visible shot effect',()=>{
++  let state=isolated();
++  state.units=[makeUnit(1,'heavy','player',0,0),{...makeUnit(101,'infantry','enemy',2,0),hp:1}];
++  state=advanceCombat(state,.1);
++  assert(!state.units.some(u=>u.id===101));
++  assert.equal(state.kills,1);
++  assert(state.shots.some(s=>s.faction==='player'&&s.toX===2));
++});
