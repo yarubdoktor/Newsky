@@ -1,9 +1,10 @@
-name: Build IRON FRONT 0.9 Android APK
+name: Build IRON FRONT 0.10 Combat APK
 on:
   push:
     paths:
       - '.github/workflows/iron-front-inspect.yml'
       - 'IRON-FRONT-0.9-SOURCE.zip'
+      - 'COMBAT-0.10-PATCH.diff'
   workflow_dispatch:
 jobs:
   build-android:
@@ -32,11 +33,18 @@ jobs:
           echo "Building from untouched 0.9 source: $SOURCE_DIR"
           test -f "$SOURCE_DIR/src/game/FortressScene.tsx"
           test -f "$SOURCE_DIR/src/App.tsx"
-      - name: Install dependencies and build 0.9 web game
+      - name: Apply 0.10 combat update without changing the original archive
+        run: |
+          set -euo pipefail
+          cd "$SOURCE_DIR"
+          patch -p1 < "$GITHUB_WORKSPACE/COMBAT-0.10-PATCH.diff"
+          grep -q 'retaliationTargets' src/game/combatSystem.ts
+      - name: Install dependencies, test and build 0.10 web game
         run: |
           set -euo pipefail
           cd "$SOURCE_DIR"
           if [ -f package-lock.json ]; then npm ci; else npm install; fi
+          npm test
           npm run build
           test -f dist/index.html
       - name: Set up Java
@@ -69,11 +77,11 @@ jobs:
           APK="$SOURCE_DIR/android/app/build/outputs/apk/debug/app-debug.apk"
           test -s "$APK"
           ls -lh "$APK"
-          cp "$APK" "$RUNNER_TEMP/IRON-FRONT-0.9-TEST.apk"
+          cp "$APK" "$RUNNER_TEMP/IRON-FRONT-0.10-TEST.apk"
       - name: Upload 0.9 test APK
         uses: actions/upload-artifact@v4
         with:
-          name: IRON-FRONT-0.9-TEST-APK
+          name: IRON-FRONT-0.10-TEST-APK
           path: ${{ runner.temp }}/IRON-FRONT-0.9-TEST.apk
           if-no-files-found: error
           retention-days: 14
