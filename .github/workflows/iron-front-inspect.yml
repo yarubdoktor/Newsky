@@ -1,0 +1,28 @@
+name: Inspect IRON FRONT Android package
+on:
+  push:
+    paths:
+      - '.github/workflows/iron-front-inspect.yml'
+      - 'IRON-FRONT-0.4-Ready.zip'
+  workflow_dispatch:
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect project archive
+        shell: bash
+        run: |
+          set -e
+          test -f "IRON-FRONT-0.4-Ready.zip"
+          mkdir -p /tmp/iron-front
+          unzip -q "IRON-FRONT-0.4-Ready.zip" -d /tmp/iron-front
+          echo "=== PROJECT FILES (first 250) ==="
+          find /tmp/iron-front -maxdepth 5 -type f | sed 's#^/tmp/iron-front/##' | head -250
+          echo "=== BUILD ENTRYPOINTS ==="
+          find /tmp/iron-front -type f \( -name package.json -o -name capacitor.config.ts -o -name capacitor.config.json -o -name settings.gradle -o -name build.gradle -o -name gradlew -o -name AndroidManifest.xml -o -name index.html -o -name vite.config.ts -o -name next.config.js -o -name next.config.mjs \) -print
+          echo "=== PACKAGE METADATA ==="
+          while IFS= read -r f; do
+            echo "--- $f"
+            sed -n '1,220p' "$f"
+          done < <(find /tmp/iron-front -name package.json -type f | head -10)
