@@ -88,14 +88,16 @@ new file mode 100755
 index 0000000..d9ac084
 --- /dev/null
 +++ b/tools/fetch-3dassets-pack.sh
-@@ -0,0 +1,23 @@
+@@ -0,0 +1,25 @@
 +#!/usr/bin/env bash
 +set -euo pipefail
 +ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 +VEHICLES="$ROOT/public/assets/3d/vehicles"
 +mkdir -p "$VEHICLES"
 +fetch_model(){
-+  local name="$1" id="$2" target="$VEHICLES/$name"
++  local name="$1"
++  local id="$2"
++  local target="$VEHICLES/$name"
 +  curl -fL --retry 3 --retry-delay 2 "https://cdn.3dassets.dev/assets/${id}/v1/model.glb" -o "$target"
 +  test -s "$target"
 +  local magic
