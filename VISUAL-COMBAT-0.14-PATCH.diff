@@ -1,19 +1,28 @@
 --- a/src/game/combatSystem.ts
 +++ b/src/game/combatSystem.ts
-@@ -83,7 +83,7 @@
+@@ -81,9 +81,8 @@
+   let engaged=false;
+   let enemyResources={...state.opponent.resources};
    const damage=new Map<number,number>(),buildingDamage=new Map<string,number>();
 -  // Remember which hostile unit actually hit each unit so defenders retaliate against
 -  // the attacker, rather than charging the enemy HQ or picking an unrelated target.
 -  const retaliationTargets=new Map<number,number>();
 +  // Count enemy attacks by source so the squad can focus the strongest active threat.
 +  const threatHits=new Map<number,number>();
-@@ -133,7 +133,8 @@
+   const buildingsOf=(faction:'player'|'enemy')=>faction==='player'?state.opponent.buildings:state.buildings;
+   // Stale building targets are cleared the tick after that structure is destroyed.
+   units=units.map(unit=>{
+@@ -133,7 +132,8 @@
+       if(ordered)preferred=ordered;
      }
      const orderedUnit=unit.targetId===-1?ENEMY_HQ:unit.targetId===-2?PLAYER_HQ:units.find(v=>v.id===unit.targetId&&v.faction!==unit.faction);
 -    const target=nearby ?? (unit.order==='attack'?preferred??(orderedUnit&&distance(unit,orderedUnit)<=unit.range?orderedUnit:null):null);
 +    const orderedVisible=orderedUnit&&distance(unit,orderedUnit)<=unit.range&&visibleTo(state,unit.faction,orderedUnit)?orderedUnit:null;
 +    const target=orderedVisible ?? nearby ?? (unit.order==='attack'?preferred:null);
-@@ -150,14 +151,17 @@
+     if(!target)continue;
+     const ammoCost=unit.armor>=7||unit.kind==='artillery'?3:1;
+     const resources=unit.faction==='player'?{ammo}:enemyResources;
+@@ -150,14 +150,17 @@
      const hit=Math.max(2,unit.damage*(1+technologies.weapons*.3)-armor+penetration)*cover*accuracy;
      if(targetUnit){
        damage.set(targetUnit.id,(damage.get(targetUnit.id)??0)+hit);
@@ -22,10 +31,21 @@
 +        if(unit.faction==='enemy'&&targetUnit.faction==='player')
 +          threatHits.set(unit.id,(threatHits.get(unit.id)??0)+1);
 +      }
-@@
+     }
+     else if('id' in target&&typeof target.id==='string')buildingDamage.set(target.id,(buildingDamage.get(target.id)??0)+hit*.3);
+     else if(unit.faction==='player')enemyHp=Math.max(0,enemyHp-hit*.12);
+     else baseHp=Math.max(0,baseHp-hit*.12);
+     unit.cooldown=unit.kind==='artillery'?3:unit.armor>=7?2.2:1.2;
+     engaged=true;
 -    shots.push({id:state.tick*1000+unit.id,x:unit.x,z:unit.z,toX:target.x,toZ:target.z,faction:unit.faction,life:.22});
 +    shots.push({id:state.tick*1000+unit.id,x:unit.x,z:unit.z,toX:target.x,toZ:target.z,faction:unit.faction,life:unit.kind==='artillery'?.48:unit.kind==='heavy'||unit.kind==='tank'?.34:.22,weapon:unit.kind});
-@@
+   }
+   // Towers and the command HQ provide functional, bounded point defense.
+   if(Math.floor(state.tick+dt+1e-7)>Math.floor(state.tick+1e-7)){
+@@ -183,17 +186,25 @@
+       .some(b=>b.kind==='hospital'&&b.status==='active'&&distance(b,u)<13);
+     return {...u,hp:Math.max(0,Math.min(u.maxHp,u.hp-(damage.get(u.id)??0)+(hospital&&!damage.has(u.id)?3*dt:0)))};
+   });
 -  // Player units that were hit automatically engage the specific hostile attacker.
 -  // This is a unit-to-unit response only: it never creates an HQ/building attack order.
 -  units=units.map(u=>{
@@ -65,6 +85,8 @@
 -export type Shot = { id:number; x:number; z:number; toX:number; toZ:number; faction:UnitFaction; life:number };
 +export type Shot = { id:number; x:number; z:number; toX:number; toZ:number; faction:UnitFaction; life:number; weapon?:UnitKind };
  export type ResearchKind='weapons'|'armor'|'mobility'|'industry'|'recon';
+ export type ResearchJob={kind:ResearchKind;remaining:number;total:number};
+ export type Technologies=Record<ResearchKind,number>;
 --- a/src/game/FortressScene.tsx
 +++ b/src/game/FortressScene.tsx
 @@ -207,6 +207,21 @@
@@ -121,6 +143,7 @@
    assert.equal(state.kills,1);
    assert(state.shots.some(s=>s.faction==='player'&&s.toX===2));
  });
++
 +
 +test('one hostile attacker triggers a shared target for the entire friendly combat force',()=>{
 +  let state=isolated();
