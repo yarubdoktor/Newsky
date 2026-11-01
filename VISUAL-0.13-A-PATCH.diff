@@ -1,0 +1,131 @@
+--- a/src/game/UnitModels.tsx
++++ b/src/game/UnitModels.tsx
+@@ -123,13 +123,13 @@
+   </group>;
+ }
+ const IMPORTED_UNIT_MODELS:Partial<Record<UnitKind,string>>={
+-  tank:'/assets/3d/vehicles/main-battle-tank.glb',
++  tank:'/assets/3d/vehicles/light-tank.glb',
+   heavy:'/assets/3d/vehicles/main-battle-tank.glb',
+   apc:'/assets/3d/vehicles/tracked-apc.glb',
+   artillery:'/assets/3d/vehicles/self-propelled-gun.glb',
+   scout:'/assets/3d/vehicles/armoured-car.glb',
+   supply:'/assets/3d/vehicles/supply-truck.glb',
+-  hauler:'/assets/3d/vehicles/supply-truck.glb',
++  hauler:'/assets/3d/vehicles/fuel-tanker.glb',
+ };
+ function ImportedUnitModel({url,enemy}:{url:string;enemy:boolean}){
+   const {scene}=useGLTF(url);
+--- a/THIRD-PARTY-3D-ASSETS.md
++++ b/THIRD-PARTY-3D-ASSETS.md
+@@ -1,17 +1,34 @@
+-# Third-party 3D assets — IRON-FRONT 0.12
++# Third-party 3D assets — IRON-FRONT 0.13
+ 
+ ## 3DAssets.dev — Tanks, Military Vehicles and Field Camp
+ - Pack: https://3dassets.dev/packs/armoured-column-and-field-camp
+-- Licence: CC0 1.0 Universal (commercial use and modification permitted; attribution not required).
+-- Pack declaration: 74 GLB models, 74,216 triangles, approximately 3.5 MB total; metres, +Y up.
+-- Selected models are downloaded during the build by `tools/fetch-3dassets-pack.sh` from the publisher CDN.
++- Licence: CC0 1.0 Universal; commercial use, modification and redistribution permitted without attribution.
++- Shared metre scale and muted olive/sand/steel/canvas palette. These selected models are static geometry.
+ 
+-| In-game role | Model | Publisher asset ID | CDN URL |
+-|---|---|---:|---|
+-| Main battle tank / heavy tank | Main Battle Tank | 23667 | https://cdn.3dassets.dev/assets/23667/v1/model.glb |
+-| APC | Tracked APC | 23668 | https://cdn.3dassets.dev/assets/23668/v1/model.glb |
+-| Self-propelled artillery | Self-Propelled Gun | 23670 | https://cdn.3dassets.dev/assets/23670/v1/model.glb |
+-| Recon vehicle | Armoured Car | 23669 | https://cdn.3dassets.dev/assets/23669/v1/model.glb |
+-| Supply / haul truck | Supply Truck | 23674 | https://cdn.3dassets.dev/assets/23674/v1/model.glb |
++## 3DAssets.dev — Forest Trees and Woodland Plants
++- Pack: https://3dassets.dev/packs/temperate-forest-ecology
++- Licence: CC0 1.0 Universal; commercial use permitted without attribution.
++- Three selected low-poly species are instanced in forest and snow biomes.
+ 
+-The publisher describes these models as static geometry without rigs or animation. Vehicle movement remains controlled by the existing game simulation. The current in-game faction tint is applied as a subtle material tint to cloned model materials.
++| Role | Asset | ID |
++|---|---|---:|
++| Main battle tank | Light Tank | 23673 |
++| Haul truck | Fuel Tanker | 23675 |
++| HQ | Command Tent | 23689 |
++| Barracks | Squad Tent | 23687 |
++| Power | Generator Trailer | 23688 |
++| Refinery | Fuel Dump Berm | 23701 |
++| Factory | Camouflage Net Frame | 23698 |
++| Research | Radar Trailer | 23685 |
++| Watchtower / perimeter towers | Guard Tower | 23692 |
++| Hospital | Field Hospital Tent | 23690 |
++| Ammunition depot | Storage Container | 23702 |
++| Vehicle works | Field Office | 23703 |
++| Airfield | Helipad Marker | 23699 |
++| Missile defence | Mobile Rocket Launcher | 23671 |
++| Walls | Sandbag Wall Straight | 23694 |
++| Command relay | Command Vehicle | 23681 |
++| Base dressing | Gate, supply point, flag, searchlight, ambulance and tanker | 23695, 23705, 23700, 23684, 23676, 23675 |
++| Woodland | Mature Oak / Sycamore / Norway Spruce | 3776 / 3775 / 3801 |
++
++The imported models are static; the existing game simulation still controls movement, selection, building health, construction progress and combat. The asset publisher does not provide collision or navigation data.
+--- /dev/null
++++ b/tools/fetch-iron013-assets.sh
+@@ -0,0 +1,49 @@
++#!/usr/bin/env bash
++set -euo pipefail
++ROOT="$(cd "$(dirname "$0")/.." && pwd)"
++BASE="$ROOT/public/assets/3d/base"
++NATURE="$ROOT/public/assets/3d/nature"
++VEHICLES="$ROOT/public/assets/3d/vehicles"
++mkdir -p "$BASE" "$NATURE" "$VEHICLES"
++fetch(){
++  local folder="$1" name="$2" id="$3" max="$4" target="$folder/$name"
++  curl -fL --retry 3 --retry-delay 2 "https://cdn.3dassets.dev/assets/${id}/v1/model.glb" -o "$target"
++  test -s "$target"
++  test "$(head -c 4 "$target")" = "glTF"
++  local bytes; bytes="$(wc -c < "$target")"
++  test "$bytes" -gt 1024; test "$bytes" -lt "$max"
++  echo "Verified $name (${bytes} bytes)"
++}
++# Field-camp and base structures, fortifications, logistics and support props (CC0).
++fetch "$BASE" command-tent.glb 23689 300000
++fetch "$BASE" squad-tent.glb 23687 300000
++fetch "$BASE" generator-trailer.glb 23688 300000
++fetch "$BASE" fuel-dump-berm.glb 23701 300000
++fetch "$BASE" camo-net-frame.glb 23698 300000
++fetch "$BASE" radar-trailer.glb 23685 300000
++fetch "$BASE" guard-tower.glb 23692 300000
++fetch "$BASE" field-hospital-tent.glb 23690 300000
++fetch "$BASE" storage-container.glb 23702 300000
++fetch "$BASE" field-office.glb 23703 300000
++fetch "$BASE" helipad-marker.glb 23699 300000
++fetch "$BASE" mobile-rocket-launcher.glb 23671 300000
++fetch "$BASE" sandbag-wall-straight.glb 23694 300000
++fetch "$BASE" camp-gate.glb 23695 300000
++fetch "$BASE" basket-wall-straight.glb 23693 300000
++fetch "$BASE" basket-wall-corner.glb 23696 300000
++fetch "$BASE" trench-straight.glb 23704 300000
++fetch "$BASE" trench-corner.glb 23706 300000
++fetch "$BASE" supply-point.glb 23705 300000
++fetch "$BASE" flag-pole.glb 23700 300000
++fetch "$BASE" searchlight.glb 23684 300000
++fetch "$BASE" field-ambulance.glb 23676 300000
++fetch "$BASE" fuel-tanker.glb 23675 300000
++fetch "$BASE" command-vehicle.glb 23681 300000
++fetch "$BASE" recovery-vehicle.glb 23678 300000
++# Add two role-specific vehicles to the existing 0.12 vehicle roster.
++fetch "$VEHICLES" light-tank.glb 23673 300000
++fetch "$VEHICLES" fuel-tanker.glb 23675 300000
++# Mixed woodland species in a shared low-poly art direction (CC0).
++fetch "$NATURE" mature-oak.glb 3776 300000
++fetch "$NATURE" mature-sycamore.glb 3775 300000
++fetch "$NATURE" mature-spruce.glb 3801 300000
+--- /dev/null
++++ b/CHANGES-0.13.md
+@@ -0,0 +1,9 @@
++# IRON-FRONT 0.13 — World asset integration
++
++- Replaced all 14 building silhouettes with purpose-matched CC0 GLB military base assets.
++- Replaced the four decorative corner towers with real guard-tower models.
++- Added a consistent field-camp dressing set: flag, gate, supply point, searchlight, fuel tanker, ambulance, recovery vehicle, basket wall and trench pieces.
++- Replaced procedural forest trees with instanced GLB oak, sycamore and spruce species; snow biome uses spruce. Desert remains intentionally sparse.
++- Added a distinct light tank and fuel tanker to the imported vehicle roster.
++- Preserved the existing interaction hit areas, selection, health bars, construction progress, movement, camera, combat and pathfinding.
++- All added assets are CC0 1.0. Imported models are static; gameplay remains controlled by the existing simulation.
