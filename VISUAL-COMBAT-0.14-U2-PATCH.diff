@@ -1,0 +1,132 @@
+--- a/src/game/combatSystem.ts
++++ b/src/game/combatSystem.ts
+@@ -84,3 +84,2 @@
+-  // Remember which hostile unit actually hit each unit so defenders retaliate against
+-  // the attacker, rather than charging the enemy HQ or picking an unrelated target.
+-  const retaliationTargets=new Map<number,number>();
++  // Count enemy attacks by source so the squad can focus the strongest active threat.
++  const threatHits=new Map<number,number>();
+@@ -136 +135,3 @@
+-    const target=nearby ?? (unit.order==='attack'?preferred??(orderedUnit&&distance(unit,orderedUnit)<=unit.range?orderedUnit:null):null);
++    const orderedVisible=unit.targetId!==null&&unit.targetId>=0&&orderedUnit&&distance(unit,orderedUnit)<=unit.range&&visibleTo(state,unit.faction,orderedUnit)?orderedUnit:null;
++    const orderedFallback=unit.order==='attack'&&orderedUnit&&distance(unit,orderedUnit)<=unit.range?orderedUnit:null;
++    const target=orderedVisible ?? nearby ?? (unit.order==='attack'?preferred??orderedFallback:null);
+@@ -153 +154,4 @@
+-      if(targetUnit.faction!==unit.faction)retaliationTargets.set(targetUnit.id,unit.id);
++      if(targetUnit.faction!==unit.faction){
++        if(unit.faction==='enemy'&&targetUnit.faction==='player')
++          threatHits.set(unit.id,(threatHits.get(unit.id)??0)+1);
++      }
+@@ -160 +164 @@
+-    shots.push({id:state.tick*1000+unit.id,x:unit.x,z:unit.z,toX:target.x,toZ:target.z,faction:unit.faction,life:.22});
++    shots.push({id:state.tick*1000+unit.id,x:unit.x,z:unit.z,toX:target.x,toZ:target.z,faction:unit.faction,life:unit.kind==='artillery'?.48:unit.kind==='heavy'||unit.kind==='tank'?.34:.22,weapon:unit.kind});
+@@ -186,11 +190,19 @@
+-  // Player units that were hit automatically engage the specific hostile attacker.
+-  // This is a unit-to-unit response only: it never creates an HQ/building attack order.
+-  units=units.map(u=>{
+-    if(u.faction!=='player'||u.hp<=0)return u;
+-    const attackerId=retaliationTargets.get(u.id);
+-    if(attackerId===undefined)return u;
+-    const attacker=units.find(v=>v.id===attackerId&&v.faction==='enemy'&&v.hp>0);
+-    if(!attacker)return u;
+-    return {...u,order:'attack' as const,targetId:attacker.id,targetBld:null,
+-      targetX:attacker.x,targetZ:attacker.z,path:[]};
+-  });
++  // Squad-wide threat response: one enemy firing on any friendly combat unit
++  // becomes the shared target for the whole combat force, not only the victim.
++  // Non-combat logistics stay on task; explicit structure/HQ attack orders are preserved.
++  if(threatHits.size){
++    const friendlyCombat=units.filter(u=>u.faction==='player'&&u.hp>0&&u.damage>0&&UNIT_SPECS[u.kind].range>0);
++    const center=friendlyCombat.reduce((p,u)=>({x:p.x+u.x,z:p.z+u.z}),{x:0,z:0});
++    if(friendlyCombat.length){center.x/=friendlyCombat.length;center.z/=friendlyCombat.length;}
++    const sharedThreat=[...threatHits.entries()].map(([id,hits])=>({
++      unit:units.find(v=>v.id===id&&v.faction==='enemy'&&v.hp>0),hits
++    })).filter(v=>v.unit).sort((a,b)=>b.hits-a.hits||distance(a.unit!,center)-distance(b.unit!,center))[0]?.unit;
++    if(sharedThreat){
++      units=units.map(u=>{
++        if(u.faction!=='player'||u.hp<=0||u.damage<=0||UNIT_SPECS[u.kind].range<=0)return u;
++        if(u.order==='attack'&&(u.targetBld||u.targetId===-1))return u;
++        return {...u,order:'attack' as const,targetId:sharedThreat.id,targetBld:null,
++          targetX:sharedThreat.x,targetZ:sharedThreat.z,path:[]};
++      });
++    }
++  }
+--- a/src/game/types.ts
++++ b/src/game/types.ts
+@@ -18 +18 @@
+-export type Shot = { id:number; x:number; z:number; toX:number; toZ:number; faction:UnitFaction; life:number };
++export type Shot = { id:number; x:number; z:number; toX:number; toZ:number; faction:UnitFaction; life:number; weapon?:UnitKind };
+--- a/src/game/FortressScene.tsx
++++ b/src/game/FortressScene.tsx
+@@ -209,0 +210,15 @@
++/** Low-cost static shell scars and scattered debris add battlefield scale without changing navigation. */
++function BattlefieldDetails(){
++  const marks=useMemo(()=>Array.from({length:18},(_,i)=>({
++    x:-18+((i*37)%87),z:-19+((i*23)%38),r:.55+(i%4)*.18,rot:(i*1.71)%Math.PI
++  })),[]);
++  return <group>
++    {marks.map((m,i)=><group key={i} position={[m.x,.045,m.z]} rotation={[-Math.PI/2,0,m.rot]}>
++      <mesh><circleGeometry args={[m.r,18]}/><meshBasicMaterial color="#202b28" transparent opacity={.25} depthWrite={false}/></mesh>
++      <mesh><ringGeometry args={[m.r*.72,m.r,18]}/><meshBasicMaterial color="#657064" transparent opacity={.28} depthWrite={false}/></mesh>
++    </group>)}
++    {marks.filter((_,i)=>i%2===0).map((m,i)=><mesh key={`debris-${i}`} position={[m.x+.8,.13,m.z-.35]} rotation={[.2,i*.8,.15]}>
++      <dodecahedronGeometry args={[.18+(i%3)*.05,0]}/><meshStandardMaterial color="#62645a" roughness={1}/>
++    </mesh>)}
++  </group>;
++}
+@@ -342,0 +358 @@
++      <BattlefieldDetails/>
+@@ -364,2 +380,2 @@
+-          scale={1+(0.22-shot.life)*5}>
+-          <ringGeometry args={[.16,.28,16]}/>
++          scale={1+(Math.max(0,(shot.weapon==='artillery'?.48:shot.weapon==='heavy'||shot.weapon==='tank'?.34:.22)-shot.life))* (shot.weapon==='artillery'?8:5)}>
++          <ringGeometry args={[shot.weapon==='artillery'?.28:.16,shot.weapon==='artillery'?.52:.28,20]}/>
+@@ -367 +383 @@
+-            opacity={Math.max(0,shot.life/.22)*.8} depthWrite={false}/>
++            opacity={Math.max(0,shot.life/(shot.weapon==='artillery'?.48:shot.weapon==='heavy'||shot.weapon==='tank'?.34:.22))*.8} depthWrite={false}/>
+@@ -368,0 +385,11 @@
++        {(shot.weapon==='artillery'||shot.weapon==='heavy'||shot.weapon==='tank')&&<group>
++          <mesh position={[shot.toX,.38+(.48-shot.life)*1.5,shot.toZ]} scale={1+(.48-shot.life)*3}>
++            <sphereGeometry args={[shot.weapon==='artillery'?.48:.28,8,6]}/>
++            <meshBasicMaterial color="#d58b55" transparent opacity={Math.max(0,shot.life/.48)*.32} depthWrite={false}/>
++          </mesh>
++          {[0,1,2].map(i=><mesh key={i} position={[shot.toX+(i-1)*.22,.65+(.48-shot.life)*(1.2+i*.18),shot.toZ+(i%2?-.18:.18)]}
++            scale={.65+(.48-shot.life)*1.8}>
++            <sphereGeometry args={[.24,7,6]}/><meshBasicMaterial color="#5b625e" transparent
++              opacity={Math.max(0,shot.life/.48)*.28} depthWrite={false}/>
++          </mesh>)}
++        </group>}
+--- a/tests/simulation.test.ts
++++ b/tests/simulation.test.ts
+@@ -398,0 +399,31 @@
++
++
++test('one hostile attacker triggers a shared target for the entire friendly combat force',()=>{
++  let state=isolated();
++  const infantry=makeUnit(1,'infantry','player',0,0);
++  const tank=makeUnit(2,'tank','player',-1,2);
++  const sniper=makeUnit(3,'sniper','player',1,3);
++  const worker=makeUnit(4,'worker','player',-3,1);
++  const supply=makeUnit(5,'supply','player',-4,2);
++  const attacker=makeUnit(101,'heavy','enemy',3,0);
++  state.units=[infantry,tank,sniper,worker,supply,attacker];
++  state=advanceCombat(state,.1);
++  for(const id of [1,2,3]){
++    const unit=state.units.find(u=>u.id===id)!;
++    assert.equal(unit.order,'attack',`combat unit ${id} should join the response`);
++    assert.equal(unit.targetId,101,`combat unit ${id} should share the same threat target`);
++  }
++  assert.notEqual(state.units.find(u=>u.id===4)!.targetId,101,'workers must not be pulled into combat');
++  assert.notEqual(state.units.find(u=>u.id===5)!.targetId,101,'supply vehicles must not be pulled into combat');
++});
++
++test('collective defense does not replace an explicit HQ attack order',()=>{
++  let state=isolated();
++  const ordered={...makeUnit(1,'heavy','player',0,0),order:'attack' as const,targetId:-1};
++  const defender=makeUnit(2,'infantry','player',0,2);
++  const attacker=makeUnit(101,'heavy','enemy',3,0);
++  state.units=[ordered,defender,attacker];
++  state=advanceCombat(state,.1);
++  assert.equal(state.units.find(u=>u.id===1)!.targetId,-1);
++  assert.equal(state.units.find(u=>u.id===2)!.targetId,101);
+});
