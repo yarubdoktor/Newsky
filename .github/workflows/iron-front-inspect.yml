@@ -15,15 +15,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: /tmp/iron-front/IRON-FRONT-0.4/SOURCE/package-lock.json
       - name: Extract IRON FRONT source
         run: |
-          mkdir -p /tmp/iron-front
-          unzip -q "IRON-FRONT-0.4-Ready.zip" -d /tmp/iron-front
-          echo "PROJECT_DIR=$RUNNER_TEMP/iron-front/IRON-FRONT-0.4/SOURCE" >> "$GITHUB_ENV"
           mkdir -p "$RUNNER_TEMP/iron-front"
-          cp -a /tmp/iron-front/IRON-FRONT-0.4 "$RUNNER_TEMP/iron-front/"
+          unzip -q "IRON-FRONT-0.4-Ready.zip" -d "$RUNNER_TEMP/iron-front"
       - name: Install web dependencies and build
         working-directory: ${{ runner.temp }}/iron-front/IRON-FRONT-0.4/SOURCE
         run: |
