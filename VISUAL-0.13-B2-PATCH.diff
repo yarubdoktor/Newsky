@@ -1,3 +1,5 @@
+--- a/src/game/FortressScene.tsx
++++ b/src/game/FortressScene.tsx
 @@ -71,10 +141,14 @@
      </group>
      <gridHelper args={[104,52,state.biome==='snow'?'#a0b3ad':'#7d8a6e','#63775f']} position={[23,.018,0]} material-transparent material-opacity={.22}/>
