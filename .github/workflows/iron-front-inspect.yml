@@ -46,10 +46,12 @@ jobs:
           java-version: '21'
       - name: Install Android SDK packages
         run: |
-          set -euo pipefail
+          set -e
           SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -n 1)"
           test -n "$SDKMANAGER"
+          set +o pipefail
           yes | "$SDKMANAGER" --licenses
+          set -o pipefail
           "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
       - name: Create temporary Android wrapper outside repository
         run: |
