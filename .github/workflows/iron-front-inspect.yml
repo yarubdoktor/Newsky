@@ -1,4 +1,4 @@
-name: Build IRON FRONT 0.12 Imported GLB Vehicle APK
+name: Build IRON FRONT 0.13 Full World Models APK
 on:
   push:
     paths:
@@ -7,6 +7,9 @@ on:
       - 'COMBAT-0.10-PATCH.diff'
       - 'VISUAL-0.11-PATCH.diff'
       - 'VISUAL-0.12-GLB-PATCH.diff'
+      - 'VISUAL-0.13-A-PATCH.diff'
+      - 'VISUAL-0.13-B1-PATCH.diff'
+      - 'VISUAL-0.13-B2-PATCH.diff'
   workflow_dispatch:
 jobs:
   build-android:
@@ -55,14 +58,39 @@ jobs:
           patch -p1 < "$GITHUB_WORKSPACE/VISUAL-0.12-GLB-PATCH.diff"
           grep -q 'useGLTF' src/game/UnitModels.tsx
           grep -q 'main-battle-tank.glb' src/game/UnitModels.tsx
-      - name: Download and validate licensed CC0 GLB models
+      - name: Download and validate 0.12 CC0 vehicle models
         run: |
           set -euo pipefail
           cd "$SOURCE_DIR"
           bash tools/fetch-3dassets-pack.sh
-          find public/assets/3d/vehicles -type f -name '*.glb' -printf '%f %s bytes\n'
           test "$(find public/assets/3d/vehicles -type f -name '*.glb' | wc -l)" -eq 5
-      - name: Install dependencies, test and build 0.12 web game
+      - name: Apply 0.13 base, fortification and nature model integration
+        run: |
+          set -euo pipefail
+          cd "$SOURCE_DIR"
+          patch -p1 < "$GITHUB_WORKSPACE/VISUAL-0.13-A-PATCH.diff"
+          patch -p1 < "$GITHUB_WORKSPACE/VISUAL-0.13-B1-PATCH.diff"
+          patch -p1 < "$GITHUB_WORKSPACE/VISUAL-0.13-B2-PATCH.diff"
+          grep -q 'STRUCTURE_MODELS' src/game/FortressScene.tsx
+          grep -q 'InstancedNature' src/game/FortressScene.tsx
+          grep -q 'BaseDressing' src/game/FortressScene.tsx
+          grep -q 'light-tank.glb' src/game/UnitModels.tsx
+      - name: Download and validate all 0.13 CC0 world assets
+        run: |
+          set -euo pipefail
+          cd "$SOURCE_DIR"
+          bash tools/fetch-iron013-assets.sh
+          BASE_COUNT="$(find public/assets/3d/base -type f -name '*.glb' | wc -l)"
+          NATURE_COUNT="$(find public/assets/3d/nature -type f -name '*.glb' | wc -l)"
+          VEHICLE_COUNT="$(find public/assets/3d/vehicles -type f -name '*.glb' | wc -l)"
+          echo "Base assets: $BASE_COUNT / 25"
+          echo "Nature assets: $NATURE_COUNT / 3"
+          echo "Vehicle assets: $VEHICLE_COUNT / 7"
+          test "$BASE_COUNT" -eq 25
+          test "$NATURE_COUNT" -eq 3
+          test "$VEHICLE_COUNT" -eq 7
+          find public/assets/3d -type f -name '*.glb' -printf '%p %s bytes\n'
+      - name: Install dependencies, test and build 0.13 web game
         run: |
           set -euo pipefail
           cd "$SOURCE_DIR"
@@ -70,13 +98,13 @@ jobs:
           npm test
           npm run build
           test -f dist/index.html
-          for model in public/assets/3d/vehicles/*.glb; do test -s "$model"; done
-      - name: Package 0.12 source archive with GLB assets
+          test "$(find public/assets/3d -type f -name '*.glb' | wc -l)" -eq 35
+      - name: Package 0.13 source archive with all GLB assets
         run: |
           set -euo pipefail
           cd "$SOURCE_DIR"
-          zip -qr "$RUNNER_TEMP/IRON-FRONT-0.12-GLB-SOURCE.zip" . -x 'node_modules/*' 'dist/*' 'android/*'
-          test -s "$RUNNER_TEMP/IRON-FRONT-0.12-GLB-SOURCE.zip"
+          zip -qr "$RUNNER_TEMP/IRON-FRONT-0.13-WORLD-SOURCE.zip" . -x 'node_modules/*' 'dist/*' 'android/*'
+          test -s "$RUNNER_TEMP/IRON-FRONT-0.13-WORLD-SOURCE.zip"
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
@@ -96,7 +124,7 @@ jobs:
           set -euo pipefail
           cd "$SOURCE_DIR"
           npm install @capacitor/core @capacitor/cli @capacitor/android
-          npx cap init "IRON FRONT 0.12" "com.yarubdoktor.ironfront012" --web-dir dist
+          npx cap init "IRON FRONT 0.13" "com.yarubdoktor.ironfront013" --web-dir dist
           npx cap add android
           npx cap sync android
           cd android
@@ -108,19 +136,19 @@ jobs:
           APK="$SOURCE_DIR/android/app/build/outputs/apk/debug/app-debug.apk"
           test -s "$APK"
           ls -lh "$APK"
-          cp "$APK" "$RUNNER_TEMP/IRON-FRONT-0.12-GLB-TEST.apk"
-          test -s "$RUNNER_TEMP/IRON-FRONT-0.12-GLB-TEST.apk"
-      - name: Upload 0.12 imported GLB test APK
+          cp "$APK" "$RUNNER_TEMP/IRON-FRONT-0.13-WORLD-TEST.apk"
+          test -s "$RUNNER_TEMP/IRON-FRONT-0.13-WORLD-TEST.apk"
+      - name: Upload 0.13 full world models test APK
         uses: actions/upload-artifact@v4
         with:
-          name: IRON-FRONT-0.12-GLB-APK
-          path: ${{ runner.temp }}/IRON-FRONT-0.12-GLB-TEST.apk
+          name: IRON-FRONT-0.13-WORLD-APK
+          path: ${{ runner.temp }}/IRON-FRONT-0.13-WORLD-TEST.apk
           if-no-files-found: error
           retention-days: 14
-      - name: Upload 0.12 source archive with models
+      - name: Upload 0.13 source archive with all models
         uses: actions/upload-artifact@v4
         with:
-          name: IRON-FRONT-0.12-GLB-SOURCE
-          path: ${{ runner.temp }}/IRON-FRONT-0.12-GLB-SOURCE.zip
+          name: IRON-FRONT-0.13-WORLD-SOURCE
+          path: ${{ runner.temp }}/IRON-FRONT-0.13-WORLD-SOURCE.zip
           if-no-files-found: error
           retention-days: 14
