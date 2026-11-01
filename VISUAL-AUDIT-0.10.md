@@ -58,12 +58,13 @@ The wall segment is one authored model instanced repeatedly (up to the existing 
 - 3 ground material sets: forest/temperate, desert, snow.
 - 1 river/water surface with biome-compatible tint and material.
 - 1 bridge asset, instanced at the existing 3 crossing coordinates.
-- 4 mountain/cliff choke-point pieces, with reusable rock variants.
+- 4 navigation-blocking mountain/cliff pieces at the river chokepoints, plus 34 decorative mountain silhouettes along the map edges (17 per side).
 - 4–6 tree silhouettes, plus low-cost bush/grass/ground-clutter variants. Current scene places up to 110 tree instances.
 - 4 rock variants, reused across the 8 existing rock placements.
-- 1 mine structure with resource-node variants, used at both faction mine positions.
-- 1 capture/depot prop family for the 3 central zones.
+- 1 mine structure with resource-node variants, used at both faction mine positions (2 live mine placements).
+- 1 capture/depot prop family for the 3 central capture zones.
 - 1 rally flag / marker family.
+- 8 corner-tower placements (4 per faction), currently assembled from box primitives.
 - Road, haul-road, track, crater and terrain-edge decals.
 - Preserve current river position, bridge coordinates, mountain chokepoints, mine coordinates, rally position and battlefield bounds.
 
@@ -81,7 +82,7 @@ The wall segment is one authored model instanced repeatedly (up to the existing 
 11. Helicopter rotor animation and rotor-wash dust
 12. Rain/snow weather particles and ambient wind cues
 
-Existing shot tracers, muzzle flash, impact ring and weather particles are retained and upgraded incrementally.
+Currently implemented: shot tracer line, small muzzle-flash sphere, impact sphere/ring, order ping and 140-point rain/snow particle field. No full explosion, fire, destruction or smoke system exists yet; those are Phase 4 assets.
 
 ### Shared visual/UI assets
 - 28 unit/building icon illustrations (14 unit + 14 building types), preferably generated from the same model renders.
