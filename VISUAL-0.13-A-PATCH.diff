@@ -67,7 +67,7 @@
 +The imported models are static; the existing game simulation still controls movement, selection, building health, construction progress and combat. The asset publisher does not provide collision or navigation data.
 --- /dev/null
 +++ b/tools/fetch-iron013-assets.sh
-@@ -0,0 +1,49 @@
+@@ -0,0 +1,53 @@
 +#!/usr/bin/env bash
 +set -euo pipefail
 +ROOT="$(cd "$(dirname "$0")/.." && pwd)"
