@@ -78,7 +78,7 @@ jobs:
           test -s "$APK"
           ls -lh "$APK"
           cp "$APK" "$RUNNER_TEMP/IRON-FRONT-0.10-TEST.apk"
-      - name: Upload 0.10 test APK
+      - name: Upload corrected 0.10 APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: IRON-FRONT-0.10-TEST-APK
