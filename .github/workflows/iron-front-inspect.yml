@@ -1,4 +1,4 @@
-name: Build IRON FRONT APK
+name: Build IRON FRONT APK (Capacitor)
 on:
   push:
     paths:
