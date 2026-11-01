@@ -1,4 +1,4 @@
-name: Build IRON FRONT 0.11 Visual APK
+name: Build IRON FRONT 0.12 Imported GLB Vehicle APK
 on:
   push:
     paths:
@@ -6,6 +6,7 @@ on:
       - 'IRON-FRONT-0.9-SOURCE.zip'
       - 'COMBAT-0.10-PATCH.diff'
       - 'VISUAL-0.11-PATCH.diff'
+      - 'VISUAL-0.12-GLB-PATCH.diff'
   workflow_dispatch:
 jobs:
   build-android:
@@ -40,14 +41,28 @@ jobs:
           cd "$SOURCE_DIR"
           patch -p1 < "$GITHUB_WORKSPACE/COMBAT-0.10-PATCH.diff"
           grep -q 'retaliationTargets' src/game/combatSystem.ts
-      - name: Apply 0.11 army visual pack
+      - name: Apply 0.11 procedural army visual pack
         run: |
           set -euo pipefail
           cd "$SOURCE_DIR"
           patch -p1 < "$GITHUB_WORKSPACE/VISUAL-0.11-PATCH.diff"
           grep -q 'function UnitVisual' src/game/UnitModels.tsx
           grep -q 'UnitVisual kind={unit.kind}' src/game/FortressScene.tsx
-      - name: Install dependencies, test and build 0.11 web game
+      - name: Apply 0.12 imported GLB vehicle models
+        run: |
+          set -euo pipefail
+          cd "$SOURCE_DIR"
+          patch -p1 < "$GITHUB_WORKSPACE/VISUAL-0.12-GLB-PATCH.diff"
+          grep -q 'useGLTF' src/game/UnitModels.tsx
+          grep -q 'main-battle-tank.glb' src/game/UnitModels.tsx
+      - name: Download and validate licensed CC0 GLB models
+        run: |
+          set -euo pipefail
+          cd "$SOURCE_DIR"
+          bash tools/fetch-3dassets-pack.sh
+          find public/assets/3d/vehicles -type f -name '*.glb' -printf '%f %s bytes\n'
+          test "$(find public/assets/3d/vehicles -type f -name '*.glb' | wc -l)" -eq 5
+      - name: Install dependencies, test and build 0.12 web game
         run: |
           set -euo pipefail
           cd "$SOURCE_DIR"
@@ -55,12 +70,13 @@ jobs:
           npm test
           npm run build
           test -f dist/index.html
-      - name: Package 0.11 source archive
+          for model in public/assets/3d/vehicles/*.glb; do test -s "$model"; done
+      - name: Package 0.12 source archive with GLB assets
         run: |
           set -euo pipefail
           cd "$SOURCE_DIR"
-          zip -qr "$RUNNER_TEMP/IRON-FRONT-0.11-VISUAL-SOURCE.zip" . -x 'node_modules/*' 'dist/*' 'android/*'
-          test -s "$RUNNER_TEMP/IRON-FRONT-0.11-VISUAL-SOURCE.zip"
+          zip -qr "$RUNNER_TEMP/IRON-FRONT-0.12-GLB-SOURCE.zip" . -x 'node_modules/*' 'dist/*' 'android/*'
+          test -s "$RUNNER_TEMP/IRON-FRONT-0.12-GLB-SOURCE.zip"
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
@@ -80,7 +96,7 @@ jobs:
           set -euo pipefail
           cd "$SOURCE_DIR"
           npm install @capacitor/core @capacitor/cli @capacitor/android
-          npx cap init "IRON FRONT 0.11" "com.yarubdoktor.ironfront011" --web-dir dist
+          npx cap init "IRON FRONT 0.12" "com.yarubdoktor.ironfront012" --web-dir dist
           npx cap add android
           npx cap sync android
           cd android
@@ -92,19 +108,19 @@ jobs:
           APK="$SOURCE_DIR/android/app/build/outputs/apk/debug/app-debug.apk"
           test -s "$APK"
           ls -lh "$APK"
-          cp "$APK" "$RUNNER_TEMP/IRON-FRONT-0.11-VISUAL-TEST.apk"
-          test -s "$RUNNER_TEMP/IRON-FRONT-0.11-VISUAL-TEST.apk"
-      - name: Upload 0.11 visual test APK
+          cp "$APK" "$RUNNER_TEMP/IRON-FRONT-0.12-GLB-TEST.apk"
+          test -s "$RUNNER_TEMP/IRON-FRONT-0.12-GLB-TEST.apk"
+      - name: Upload 0.12 imported GLB test APK
         uses: actions/upload-artifact@v4
         with:
-          name: IRON-FRONT-0.11-VISUAL-APK
-          path: ${{ runner.temp }}/IRON-FRONT-0.11-VISUAL-TEST.apk
+          name: IRON-FRONT-0.12-GLB-APK
+          path: ${{ runner.temp }}/IRON-FRONT-0.12-GLB-TEST.apk
           if-no-files-found: error
           retention-days: 14
-      - name: Upload 0.11 visual source archive
+      - name: Upload 0.12 source archive with models
         uses: actions/upload-artifact@v4
         with:
-          name: IRON-FRONT-0.11-VISUAL-SOURCE
-          path: ${{ runner.temp }}/IRON-FRONT-0.11-VISUAL-SOURCE.zip
+          name: IRON-FRONT-0.12-GLB-SOURCE
+          path: ${{ runner.temp }}/IRON-FRONT-0.12-GLB-SOURCE.zip
           if-no-files-found: error
           retention-days: 14
