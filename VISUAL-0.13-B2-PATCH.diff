@@ -1,0 +1,84 @@
+@@ -71,10 +141,14 @@
+     </group>
+     <gridHelper args={[104,52,state.biome==='snow'?'#a0b3ad':'#7d8a6e','#63775f']} position={[23,.018,0]} material-transparent material-opacity={.22}/>
+     <mesh position={[23,.025,3]} rotation={[-Math.PI/2,0,0]}><planeGeometry args={[88,3.2]}/><meshStandardMaterial color={state.biome==='snow'?'#9baaa6':'#897f69'} roughness={1}/></mesh>
+-    {state.biome!=='desert'&&<><Instances limit={140} castShadow><cylinderGeometry args={[.13,.2,1.6,5]}/><meshStandardMaterial color="#4b4c3c"/>
+-      {trees.map((t,i)=><Instance key={i} position={[t.x,.8*t.s,t.z]} scale={t.s}/>)}</Instances>
+-      <Instances limit={140} castShadow><coneGeometry args={[1,2.8,6]}/><meshStandardMaterial color={state.biome==='snow'?'#819b90':'#294b3c'}/>
+-        {trees.map((t,i)=><Instance key={i} position={[t.x,2.4*t.s,t.z]} scale={t.s}/>)}</Instances></>}
++    <Suspense fallback={null}>
++      {state.biome==='forest'&&<>
++        <InstancedNature url="/assets/3d/nature/mature-oak.glb" placements={oakTrees}/>
++        <InstancedNature url="/assets/3d/nature/mature-sycamore.glb" placements={sycamoreTrees}/>
++        <InstancedNature url="/assets/3d/nature/mature-spruce.glb" placements={spruceTrees}/>
++      </>}
++      {state.biome==='snow'&&<InstancedNature url="/assets/3d/nature/mature-spruce.glb" placements={snowTrees}/>}
++    </Suspense>
+     {rocks.map((r,i)=><mesh key={i} position={[r.x,.65,r.z]} scale={[r.r,1.2,r.r]} castShadow><dodecahedronGeometry args={[1,0]}/><meshStandardMaterial color="#707a73" roughness={1}/></mesh>)}
+     {Array.from({length:17},(_,i)=><mesh key={i} position={[-34+i*7,2,-27-(i%2)*3]} scale={[5+(i%3),4+(i%4),4]}><coneGeometry args={[1,2,5]}/><meshStandardMaterial color={state.biome==='snow'?'#a0b4b1':'#5b6b60'} roughness={1}/></mesh>)}
+     {Array.from({length:17},(_,i)=><mesh key={'s'+i} position={[-34+i*7,2,27+(i%2)*3]} scale={[5+(i%3),4+(i%4),4]}><coneGeometry args={[1,2,5]}/><meshStandardMaterial color={state.biome==='snow'?'#a0b4b1':'#5b6b60'} roughness={1}/></mesh>)}
+@@ -85,37 +159,36 @@
+   const transform=(x:number,z:number):[number,number,number]=>[enemy?46-x:x,0,enemy?-z:z];
+   return <group>
+     {[-24,-1].flatMap((x)=>[-3.4,11.6].map(z=><group key={`${x}:${z}`} position={transform(x,z)}>
+-      <Box position={[0,.85,0]} size={[1.3,1.7,1.3]} color="#718179"/><Box position={[0,1.9,0]} size={[1.6,.4,1.6]} color={enemy?'#956659':'#b5a273'}/>
++      <SafeFittedGLB url="/assets/3d/base/guard-tower.glb" maxSize={[2.1,3.9,2.1]} enemy={enemy} fallbackSize={[1.4,2.5,1.4]}/>
+     </group>))}
++  </group>;
++}
++function BaseDressing({enemy=false}:{enemy?:boolean}){
++  const place=(x:number,z:number):[number,number,number]=>[enemy?46-x:x,0,enemy?-z:z];
++  return <group>
++    <group position={place(-15,0)}><SafeFittedGLB url="/assets/3d/base/flag-pole.glb" maxSize={[.75,3.1,1.1]} enemy={enemy} fallbackSize={[.2,2.6,.2]}/></group>
++    <group position={place(-7.2,9.2)}><SafeFittedGLB url="/assets/3d/base/supply-point.glb" maxSize={[2.3,2.2,2.3]} enemy={enemy}/></group>
++    <group position={place(-16.2,8.5)}><SafeFittedGLB url="/assets/3d/base/searchlight.glb" maxSize={[1.2,1.6,1.2]} enemy={enemy}/></group>
++    <group position={place(-7.4,-1.8)}><SafeFittedGLB url="/assets/3d/base/fuel-tanker.glb" maxSize={[2.8,1.8,2.2]} enemy={enemy}/></group>
++    <group position={place(-16,10.5)}><SafeFittedGLB url="/assets/3d/base/field-ambulance.glb" maxSize={[2.5,1.9,2.3]} enemy={enemy}/></group>
++    <group position={place(-18.2,4)}><SafeFittedGLB url="/assets/3d/base/camp-gate.glb" maxSize={[3.8,2.8,1.2]} enemy={enemy}/></group>
++    <group position={place(-4.5,-5.5)}><SafeFittedGLB url="/assets/3d/base/recovery-vehicle.glb" maxSize={[2.8,1.8,2.5]} enemy={enemy}/></group>
++    <group position={place(-20.5,10.5)}><SafeFittedGLB url="/assets/3d/base/basket-wall-straight.glb" maxSize={[3,1.4,1]} enemy={enemy}/></group>
++    <group position={place(-20.5,-7.5)}><SafeFittedGLB url="/assets/3d/base/trench-straight.glb" maxSize={[3.8,1.7,3.2]} enemy={enemy}/></group>
++    <group position={place(-16.5,-9.5)}><SafeFittedGLB url="/assets/3d/base/trench-corner.glb" maxSize={[3.6,1.7,3.6]} enemy={enemy}/></group>
+   </group>;
+ }
+ function Structure({building,enemy=false,onAttackBuilding,onSelectBuilding,selected}:{building:Building;enemy?:boolean;
+   onAttackBuilding:(id:string)=>void;onSelectBuilding:(id:string)=>void;selected?:boolean}) {
+   const {kind,x,z,status,remaining,buildSeconds}=building;
+-  const colors:Record<BuildingKind,string>={hq:'#a9b8b5',barracks:'#819878',power:'#b4a76d',refinery:'#9ba49c',
+-    factory:'#869a9d',research:'#819fa6',watchtower:'#9eac9e',hospital:'#c2cbc0',ammo:'#a99a72',
+-    vehicleFactory:'#819490',airfield:'#7b918d',missile:'#9d9e89',wall:'#87968b',command:'#9caca8'};
+-  const c=enemy?'#a76b5d':colors[kind],progress=status==='active'?1:1-remaining/buildSeconds;
+-  const tower=kind==='watchtower'||kind==='missile',height=tower?2.7:kind==='hq'?1.6:1;
++  const progress=status==='active'?1:1-remaining/buildSeconds;
+   return <group position={[x,0,z]} onClick={e=>{e.stopPropagation();if(e.delta>6)return;
+       if(enemy)onAttackBuilding(building.id);else onSelectBuilding(building.id);}}>
+     {selected&&!enemy&&<mesh rotation={[-Math.PI/2,0,0]} position={[0,.05,0]}><ringGeometry args={[3,3.2,40]}/><meshBasicMaterial color="#e8cb7f"/></mesh>}
+     <Box position={[0,.08,0]} size={kind==='hq'?[4.8,.16,4.2]:[3.2,.16,2.8]} color="#34473f"/>
+     <group scale={[1,Math.max(.08,progress),1]}>
+-      <Box position={[0,height/2,0]} size={tower?[.8,height,.8]:kind==='wall'?[2.8,1.3,.65]:kind==='hq'?[3.8,height,3.2]:[2.7,height,2.3]} color={c}/>
+-      {!['wall','refinery','airfield'].includes(kind)&&<Box position={[0,height+.18,0]} size={tower?[1.5,.35,1.5]:[2,.35,1.6]} color={enemy?'#66493f':'#41564f'}/>}
+-      {(kind==='hq'||kind==='command'||kind==='research')&&<group position={[.55,height+.3,0]}>
+-        <Box position={[0,.65,0]} size={[.08,1.3,.08]} color="#263b35"/>
+-        <mesh position={[0,1.25,0]} rotation={[.3,0,.5]}><sphereGeometry args={[.5,12,6,0,Math.PI]}/><meshStandardMaterial color="#c6d0bc" side={THREE.DoubleSide}/></mesh>
+-      </group>}
+-      {kind==='power'&&<><Box position={[-.6,1.7,0]} size={[.45,1.4,.45]} color="#d4c398"/><Box position={[.6,1.5,0]} size={[.45,1,.45]} color="#d4c398"/></>}
+-      {kind==='refinery'&&[-.8,0,.8].map(offset=><mesh key={offset} position={[offset,1.2,0]} castShadow><cylinderGeometry args={[.4,.4,2,12]}/><meshStandardMaterial color="#c1c3a8" roughness={.45} metalness={.5}/></mesh>)}
+-      {(kind==='factory'||kind==='vehicleFactory')&&<Box position={[0,.5,1.18]} size={[1.8,.8,.08]} color="#172b25"/>}
+-      {kind==='barracks'&&[-.8,0,.8].map(offset=><Box key={offset} position={[offset,.6,1.17]} size={[.3,.35,.04]} color="#d3d0a6"/>)}
+-      {kind==='hospital'&&<><Box position={[0,1.4,0]} size={[.4,.08,1.3]} color="#d64f40"/><Box position={[0,1.4,0]} size={[1.3,.08,.4]} color="#d64f40"/></>}
+-      {kind==='airfield'&&<><Box position={[0,1.03,0]} size={[2.8,.04,2.5]} color="#4b5a54"/><Box position={[0,1.08,0]} size={[1.6,.03,.15]} color="#dad9b5"/><Box position={[-.8,1.08,0]} size={[.15,.03,1.4]} color="#dad9b5"/><Box position={[.8,1.08,0]} size={[.15,.03,1.4]} color="#dad9b5"/></>}
+-      {kind==='missile'&&<group position={[0,3.1,0]} rotation={[0,0,-.5]}><Box size={[1.3,.45,.8]} color="#d4ca98"/><Box position={[-.5,.3,0]} size={[.12,.4,.9]} color="#364c40"/></group>}
+-      {kind==='ammo'&&[-.7,.1,.8].map(offset=><Box key={offset} position={[offset,1.35,0]} size={[.5,.5,.7]} color="#d0b979"/>)}
++      <SafeFittedGLB url={STRUCTURE_MODELS[kind]} maxSize={STRUCTURE_FIT[kind]} enemy={enemy}
++        fallbackSize={kind==='wall'?[2.8,1.2,.7]:kind==='watchtower'?[1.3,2.8,1.3]:[2.6,1.4,2.2]}/>
+     </group>
+     <mesh position={[0,.19,1.6]} rotation={[-Math.PI/2,0,0]}><planeGeometry args={[2.5*building.hp/building.maxHp,.12]}/><meshBasicMaterial color={enemy?'#ee9683':'#a9d8ab'}/></mesh>
+     {building.level>1&&<mesh position={[1.2,1.5,0]}><sphereGeometry args={[.14,6,6]}/><meshBasicMaterial color="#e8cb7f"/></mesh>
+@@ -269,6 +342,7 @@
+       <Terrain state={state} rallyMode={!!rallyMode} onMoveOrder={orderMove} onSetRally={onSetRally}/>
+       <OrderPing ping={ping}/>
+       <CornerTowers/><CornerTowers enemy/>
++      <BaseDressing/><BaseDressing enemy/>
+       {state.buildings.map(b=><Structure key={b.id} building={b} onAttackBuilding={onAttackBuilding}
+         onSelectBuilding={onSelectBuilding} selected={selectedBuildingId===b.id}/>)}
+       {state.opponent.buildings.filter(b=>b.kind==='hq'||visibleTo(state,'player',b)).map(b=>
