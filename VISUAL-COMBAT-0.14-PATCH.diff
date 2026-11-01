@@ -42,7 +42,7 @@
    }
    // Towers and the command HQ provide functional, bounded point defense.
    if(Math.floor(state.tick+dt+1e-7)>Math.floor(state.tick+1e-7)){
-@@ -183,17 +186,25 @@
+@@ -183,14 +186,22 @@
        .some(b=>b.kind==='hospital'&&b.status==='active'&&distance(b,u)<13);
      return {...u,hp:Math.max(0,Math.min(u.maxHp,u.hp-(damage.get(u.id)??0)+(hospital&&!damage.has(u.id)?3*dt:0)))};
    });
@@ -89,7 +89,7 @@
  export type Technologies=Record<ResearchKind,number>;
 --- a/src/game/FortressScene.tsx
 +++ b/src/game/FortressScene.tsx
-@@ -207,6 +207,21 @@
+@@ -207,4 +207,19 @@
        <mesh position={[-.475*(1-unit.hp/unit.maxHp),0,.002]}><planeGeometry args={[.95*unit.hp/unit.maxHp,.065]}/><meshBasicMaterial color={enemy?'#ed9b8e':'#a3e1ac'}/></mesh></group>
    </group>;
  }
@@ -109,13 +109,13 @@
 +  </group>;
 +}
  function Weather({state,paused}:{state:GameState;paused:boolean}){
-@@ -340,6 +355,7 @@
+@@ -340,4 +355,5 @@
        <directionalLight position={[-18,28,10]} intensity={daylight*2.2} castShadow shadow-mapSize={[1024,1024]}
          shadow-camera-left={-60} shadow-camera-right={60} shadow-camera-top={50} shadow-camera-bottom={-50} shadow-bias={-.001}/>
        <Terrain state={state} rallyMode={!!rallyMode} onMoveOrder={orderMove} onSetRally={onSetRally}/>
 +      <BattlefieldDetails/>
        <OrderPing ping={ping}/>
-@@ -361,11 +377,22 @@
+@@ -361,7 +377,18 @@
          <mesh position={[shot.toX,.72,shot.toZ]}><sphereGeometry args={[.2,8,6]}/><meshBasicMaterial color="#ffd293"/></mesh>
          <mesh position={[shot.toX,.075,shot.toZ]} rotation={[-Math.PI/2,0,0]}
 -          scale={1+(0.22-shot.life)*5}>
