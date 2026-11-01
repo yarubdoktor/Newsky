@@ -1,0 +1,106 @@
+{
+  "project": "IRON-FRONT",
+  "baseline": "0.10",
+  "branch": "iron-front-visual-1.0",
+  "renderer": "Three.js / React Three Fiber",
+  "format": "glb",
+  "constraints": [
+    "Do not modify touch controls, selection, movement, camera, minimap, navigation, combat logic, simulation stats, or existing hit areas."
+  ],
+  "unitModels": [
+    "infantry",
+    "sniper",
+    "engineer",
+    "antitank",
+    "scout",
+    "tank",
+    "heavy",
+    "apc",
+    "artillery",
+    "helicopter",
+    "drone",
+    "supply",
+    "worker",
+    "hauler"
+  ],
+  "buildingModels": [
+    "hq",
+    "barracks",
+    "power",
+    "refinery",
+    "factory",
+    "research",
+    "watchtower",
+    "hospital",
+    "ammo",
+    "vehicleFactory",
+    "airfield",
+    "missile",
+    "wall",
+    "command"
+  ],
+  "terrain": {
+    "biomes": [
+      "forest",
+      "desert",
+      "snow"
+    ],
+    "uniqueGroundMaterialSets": 3,
+    "bridgeModels": 1,
+    "bridgeInstances": 3,
+    "mountainPieces": 4,
+    "treeVariants": 6,
+    "rockVariants": 4,
+    "mineModelVariants": 1,
+    "centralDepotPropFamily": 1,
+    "rallyMarkerFamily": 1
+  },
+  "effects": [
+    "small-arms-muzzle-tracer",
+    "bullet-impact",
+    "anti-armor-rocket",
+    "tank-cannon",
+    "artillery-shell-impact",
+    "explosion-debris",
+    "building-fire-smoke",
+    "vehicle-damage-smoke",
+    "vehicle-exhaust-dust",
+    "infantry-footstep-dust",
+    "helicopter-rotor-wash",
+    "rain-snow-wind"
+  ],
+  "implementationPhases": [
+    {
+      "phase": 0,
+      "name": "Audit and asset pipeline",
+      "status": "complete"
+    },
+    {
+      "phase": 1,
+      "name": "Army visual pack",
+      "status": "next",
+      "assets": 14
+    },
+    {
+      "phase": 2,
+      "name": "Base and building pack",
+      "status": "planned",
+      "assets": 14
+    },
+    {
+      "phase": 3,
+      "name": "Terrain and battlefield pack",
+      "status": "planned"
+    },
+    {
+      "phase": 4,
+      "name": "Combat VFX and environmental animation",
+      "status": "planned"
+    },
+    {
+      "phase": 5,
+      "name": "Polish, optimization and release verification",
+      "status": "planned"
+    }
+  ]
+}
