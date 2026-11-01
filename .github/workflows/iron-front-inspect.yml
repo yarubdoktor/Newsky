@@ -66,7 +66,7 @@ jobs:
           set -euo pipefail
           cd "$SOURCE_DIR"
           npm install @capacitor/core @capacitor/cli @capacitor/android
-          npx cap init "IRON FRONT 0.9" "com.yarubdoktor.ironfront09" --web-dir dist
+          npx cap init "IRON FRONT 0.10" "com.yarubdoktor.ironfront010" --web-dir dist
           npx cap add android
           npx cap sync android
           cd android
@@ -78,10 +78,10 @@ jobs:
           test -s "$APK"
           ls -lh "$APK"
           cp "$APK" "$RUNNER_TEMP/IRON-FRONT-0.10-TEST.apk"
-      - name: Upload 0.9 test APK
+      - name: Upload 0.10 test APK
         uses: actions/upload-artifact@v4
         with:
           name: IRON-FRONT-0.10-TEST-APK
-          path: ${{ runner.temp }}/IRON-FRONT-0.9-TEST.apk
+          path: ${{ runner.temp }}/IRON-FRONT-0.10-TEST.apk
           if-no-files-found: error
           retention-days: 14
