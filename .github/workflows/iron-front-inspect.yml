@@ -1,9 +1,9 @@
-name: Build IRON FRONT 0.6 APK
+name: Build IRON FRONT 0.8 APK
 on:
   push:
     paths:
       - '.github/workflows/iron-front-inspect.yml'
-      - 'IRON-FRONT-0.6-Ready.zip'
+      - 'IRON-FRONT-0.8-Ready.zip'
   workflow_dispatch:
 jobs:
   build-android:
@@ -15,10 +15,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Extract IRON FRONT 0.6 source
+      - name: Extract IRON FRONT 0.8 source
         run: |
           mkdir -p "$RUNNER_TEMP/iron-front"
-          unzip -q "IRON-FRONT-0.6-Ready.zip" -d "$RUNNER_TEMP/iron-front"
+          unzip -q "IRON-FRONT-0.8-Ready.zip" -d "$RUNNER_TEMP/iron-front"
           SOURCE_DIR="$(find "$RUNNER_TEMP/iron-front" -type f -name package.json -not -path '*/node_modules/*' -printf '%h\n' | head -n 1)"
           if [ -z "$SOURCE_DIR" ]; then echo 'ERROR: package.json not found in ZIP'; find "$RUNNER_TEMP/iron-front" -maxdepth 4 -type f | head -n 100; exit 1; fi
           echo "SOURCE_DIR=$SOURCE_DIR" >> "$GITHUB_ENV"
@@ -53,7 +53,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: IRON-FRONT-0.6-Android-APK
+          name: IRON-FRONT-0.8-Android-APK
           path: ${{ env.SOURCE_DIR }}/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
