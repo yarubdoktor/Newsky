@@ -3,7 +3,7 @@
   "baseline": "0.10",
   "branch": "iron-front-visual-1.0",
   "renderer": "Three.js / React Three Fiber",
-  "format": "glb",
+  "format": "procedural-meshes (phase 1); GLB-ready for later authored assets",
   "constraints": [
     "Do not modify touch controls, selection, movement, camera, minimap, navigation, combat logic, simulation stats, or existing hit areas."
   ],
@@ -78,7 +78,7 @@
     {
       "phase": 1,
       "name": "Army visual pack",
-      "status": "next",
+      "status": "implemented_pending_build_verification",
       "assets": 14
     },
     {
