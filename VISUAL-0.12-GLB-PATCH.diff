@@ -1,0 +1,114 @@
+diff --git a/THIRD-PARTY-3D-ASSETS.md b/THIRD-PARTY-3D-ASSETS.md
+new file mode 100644
+index 0000000..36dc779
+--- /dev/null
++++ b/THIRD-PARTY-3D-ASSETS.md
+@@ -0,0 +1,17 @@
++# Third-party 3D assets — IRON-FRONT 0.12
++
++## 3DAssets.dev — Tanks, Military Vehicles and Field Camp
++- Pack: https://3dassets.dev/packs/armoured-column-and-field-camp
++- Licence: CC0 1.0 Universal (commercial use and modification permitted; attribution not required).
++- Pack declaration: 74 GLB models, 74,216 triangles, approximately 3.5 MB total; metres, +Y up.
++- Selected models are downloaded during the build by `tools/fetch-3dassets-pack.sh` from the publisher CDN.
++
++| In-game role | Model | Publisher asset ID | CDN URL |
++|---|---|---:|---|
++| Main battle tank / heavy tank | Main Battle Tank | 23667 | https://cdn.3dassets.dev/assets/23667/v1/model.glb |
++| APC | Tracked APC | 23668 | https://cdn.3dassets.dev/assets/23668/v1/model.glb |
++| Self-propelled artillery | Self-Propelled Gun | 23670 | https://cdn.3dassets.dev/assets/23670/v1/model.glb |
++| Recon vehicle | Armoured Car | 23669 | https://cdn.3dassets.dev/assets/23669/v1/model.glb |
++| Supply / haul truck | Supply Truck | 23674 | https://cdn.3dassets.dev/assets/23674/v1/model.glb |
++
++The publisher describes these models as static geometry without rigs or animation. Vehicle movement remains controlled by the existing game simulation. The current in-game faction tint is applied as a subtle material tint to cloned model materials.
+diff --git a/src/game/UnitModels.tsx b/src/game/UnitModels.tsx
+index 48af060..8ba10a1 100644
+--- a/src/game/UnitModels.tsx
++++ b/src/game/UnitModels.tsx
+@@ -1,5 +1,5 @@
+-import { useRef } from 'react';
+-import { Instance, Instances } from '@react-three/drei';
++import { Suspense, useMemo, useRef } from 'react';
++import { Instance, Instances, useGLTF } from '@react-three/drei';
+ import { useFrame } from '@react-three/fiber';
+ import * as THREE from 'three';
+ import type { UnitKind } from './types';
+@@ -122,7 +122,39 @@ function Drone({body,dark,accent}:{body:string;dark:string;accent:string}){
+     </group>))}</group>
+   </group>;
+ }
+-export function UnitVisual({kind,enemy}:{kind:UnitKind;enemy:boolean}){
++const IMPORTED_UNIT_MODELS:Partial<Record<UnitKind,string>>={
++  tank:'/assets/3d/vehicles/main-battle-tank.glb',
++  heavy:'/assets/3d/vehicles/main-battle-tank.glb',
++  apc:'/assets/3d/vehicles/tracked-apc.glb',
++  artillery:'/assets/3d/vehicles/self-propelled-gun.glb',
++  scout:'/assets/3d/vehicles/armoured-car.glb',
++  supply:'/assets/3d/vehicles/supply-truck.glb',
++  hauler:'/assets/3d/vehicles/supply-truck.glb',
++};
++function ImportedUnitModel({url,enemy}:{url:string;enemy:boolean}){
++  const {scene}=useGLTF(url);
++  const model=useMemo(()=>{
++    const clone=scene.clone(true);
++    const bounds=new THREE.Box3().setFromObject(clone),size=bounds.getSize(new THREE.Vector3()),center=bounds.getCenter(new THREE.Vector3());
++    const fit=Math.min(2.45/Math.max(size.z,.001),1.72/Math.max(size.x,.001),1.48/Math.max(size.y,.001));
++    clone.scale.setScalar(fit);
++    clone.position.set(-center.x*fit,-bounds.min.y*fit,-center.z*fit);
++    clone.traverse(object=>{
++      if(!(object as THREE.Mesh).isMesh)return;
++      const mesh=object as THREE.Mesh;mesh.castShadow=true;mesh.receiveShadow=true;
++      const tint=new THREE.Color(enemy?'#c58a80':'#aebda0');
++      const apply=(material:THREE.Material)=>{
++        const copy=material.clone();
++        if((copy as THREE.MeshStandardMaterial).color)(copy as THREE.MeshStandardMaterial).color.multiply(tint);
++        return copy;
++      };
++      mesh.material=Array.isArray(mesh.material)?mesh.material.map(apply):apply(mesh.material);
++    });
++    return clone;
++  },[scene,enemy]);
++  return <primitive object={model}/>;
++}
++function ProceduralUnit({kind,enemy}:{kind:UnitKind;enemy:boolean}){
+   const body=enemy?'#9b594d':'#647653',dark=enemy?'#543a35':'#344536',accent=enemy?'#c08a70':'#b59a62';
+   const human=['infantry','sniper','engineer','antitank','worker'].includes(kind);
+   const scale:Record<UnitKind,number>={infantry:.92,sniper:.92,engineer:.92,antitank:.92,worker:.92,scout:.76,tank:.76,heavy:.72,apc:.72,artillery:.74,helicopter:.82,drone:.88,supply:.72,hauler:.72};
+@@ -136,3 +168,8 @@ export function UnitVisual({kind,enemy}:{kind:UnitKind;enemy:boolean}){
+     {kind==='drone'?<Drone body={body} dark={dark} accent={accent}/>:null}
+   </group>;
+ }
++export function UnitVisual({kind,enemy}:{kind:UnitKind;enemy:boolean}){
++  const url=IMPORTED_UNIT_MODELS[kind];
++  if(!url)return <ProceduralUnit kind={kind} enemy={enemy}/>;
++  return <Suspense fallback={<ProceduralUnit kind={kind} enemy={enemy}/> }><group><ImportedUnitModel url={url} enemy={enemy}/></group></Suspense>;
++}
+diff --git a/tools/fetch-3dassets-pack.sh b/tools/fetch-3dassets-pack.sh
+new file mode 100755
+index 0000000..d9ac084
+--- /dev/null
++++ b/tools/fetch-3dassets-pack.sh
+@@ -0,0 +1,23 @@
++#!/usr/bin/env bash
++set -euo pipefail
++ROOT="$(cd "$(dirname "$0")/.." && pwd)"
++VEHICLES="$ROOT/public/assets/3d/vehicles"
++mkdir -p "$VEHICLES"
++fetch_model(){
++  local name="$1" id="$2" target="$VEHICLES/$name"
++  curl -fL --retry 3 --retry-delay 2 "https://cdn.3dassets.dev/assets/${id}/v1/model.glb" -o "$target"
++  test -s "$target"
++  local magic
++  magic="$(head -c 4 "$target")"
++  test "$magic" = "glTF"
++  local bytes
++  bytes="$(wc -c < "$target")"
++  test "$bytes" -gt 1024
++  test "$bytes" -lt 1000000
++  echo "Verified $name (${bytes} bytes)"
++}
++fetch_model main-battle-tank.glb 23667
++fetch_model tracked-apc.glb 23668
++fetch_model self-propelled-gun.glb 23670
++fetch_model armoured-car.glb 23669
++fetch_model supply-truck.glb 23674
