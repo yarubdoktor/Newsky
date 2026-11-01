@@ -1,4 +1,4 @@
-name: Build IRON FRONT 0.13 Full World Models APK
+name: Build IRON FRONT 0.14 Battlefield Immersion APK
 on:
   push:
     paths:
@@ -10,6 +10,7 @@ on:
       - 'VISUAL-0.13-A-PATCH.diff'
       - 'VISUAL-0.13-B1-PATCH.diff'
       - 'VISUAL-0.13-B2-PATCH.diff'
+      - 'VISUAL-COMBAT-0.14-PATCH.diff'
   workflow_dispatch:
 jobs:
   build-android:
@@ -75,6 +76,9 @@ jobs:
           grep -q 'InstancedNature' src/game/FortressScene.tsx
           grep -q 'BaseDressing' src/game/FortressScene.tsx
           grep -q 'light-tank.glb' src/game/UnitModels.tsx
+          patch -p1 < "$GITHUB_WORKSPACE/VISUAL-COMBAT-0.14-PATCH.diff"
+          grep -q 'threatHits' src/game/combatSystem.ts
+          grep -q 'BattlefieldDetails' src/game/FortressScene.tsx
       - name: Download and validate all 0.13 CC0 world assets
         run: |
           set -euo pipefail
@@ -90,7 +94,7 @@ jobs:
           test "$NATURE_COUNT" -eq 3
           test "$VEHICLE_COUNT" -eq 7
           find public/assets/3d -type f -name '*.glb' -printf '%p %s bytes\n'
-      - name: Install dependencies, test and build 0.13 web game
+      - name: Install dependencies, test and build 0.14 web game
         run: |
           set -euo pipefail
           cd "$SOURCE_DIR"
@@ -99,12 +103,12 @@ jobs:
           npm run build
           test -f dist/index.html
           test "$(find public/assets/3d -type f -name '*.glb' | wc -l)" -eq 35
-      - name: Package 0.13 source archive with all GLB assets
+      - name: Package 0.14 source archive with all GLB assets
         run: |
           set -euo pipefail
           cd "$SOURCE_DIR"
-          zip -qr "$RUNNER_TEMP/IRON-FRONT-0.13-WORLD-SOURCE.zip" . -x 'node_modules/*' 'dist/*' 'android/*'
-          test -s "$RUNNER_TEMP/IRON-FRONT-0.13-WORLD-SOURCE.zip"
+          zip -qr "$RUNNER_TEMP/IRON-FRONT-0.14-BATTLEFIELD-SOURCE.zip" . -x 'node_modules/*' 'dist/*' 'android/*'
+          test -s "$RUNNER_TEMP/IRON-FRONT-0.14-BATTLEFIELD-SOURCE.zip"
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
@@ -124,7 +128,7 @@ jobs:
           set -euo pipefail
           cd "$SOURCE_DIR"
           npm install @capacitor/core @capacitor/cli @capacitor/android
-          npx cap init "IRON FRONT 0.13" "com.yarubdoktor.ironfront013" --web-dir dist
+          npx cap init "IRON FRONT 0.14" "com.yarubdoktor.ironfront014" --web-dir dist
           npx cap add android
           npx cap sync android
           cd android
@@ -136,16 +140,16 @@ jobs:
           APK="$SOURCE_DIR/android/app/build/outputs/apk/debug/app-debug.apk"
           test -s "$APK"
           ls -lh "$APK"
-          cp "$APK" "$RUNNER_TEMP/IRON-FRONT-0.13-WORLD-TEST.apk"
+          cp "$APK" "$RUNNER_TEMP/IRON-FRONT-0.14-BATTLEFIELD-TEST.apk"
           test -s "$RUNNER_TEMP/IRON-FRONT-0.13-WORLD-TEST.apk"
-      - name: Upload 0.13 full world models test APK
+      - name: Upload 0.14 battlefield immersion test APK
         uses: actions/upload-artifact@v4
         with:
-          name: IRON-FRONT-0.13-WORLD-APK
+          name: IRON-FRONT-0.14-BATTLEFIELD-APK
           path: ${{ runner.temp }}/IRON-FRONT-0.13-WORLD-TEST.apk
           if-no-files-found: error
           retention-days: 14
-      - name: Upload 0.13 source archive with all models
+      - name: Upload 0.14 source archive with all models
         uses: actions/upload-artifact@v4
         with:
           name: IRON-FRONT-0.13-WORLD-SOURCE
