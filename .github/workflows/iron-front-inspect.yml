@@ -10,7 +10,7 @@ on:
       - 'VISUAL-0.13-A-PATCH.diff'
       - 'VISUAL-0.13-B1-PATCH.diff'
       - 'VISUAL-0.13-B2-PATCH.diff'
-      - 'VISUAL-COMBAT-0.14-PATCH.diff'
+      - 'VISUAL-COMBAT-0.14-U0-PATCH.diff'
   workflow_dispatch:
 jobs:
   build-android:
