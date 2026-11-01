@@ -92,7 +92,7 @@ Existing shot tracers, muzzle flash, impact ring and weather particles are retai
 Modern military RTS, semi-realistic stylized low-poly: strong recognizable silhouettes, believable proportions and equipment, restrained weathering, faction-specific olive/charcoal versus rust-red/sand accents, readable from the current elevated mobile camera. Avoid photorealistic micro-detail that disappears at battlefield zoom.
 
 ## Technical delivery requirements
-- Model format: GLB (glTF 2.0), textures embedded, no external runtime downloads.
+- Phase 1 uses optimized in-engine procedural mesh models, so no external model downloads are required. Imported GLB (glTF 2.0) assets remain an option for later phases when they provide a measurable quality benefit.
 - Coordinate convention: Y-up; ground plane at Y=0; unit forward axis +Z; match current scene orientation.
 - Unit models must fit existing logical footprints and preserve invisible touch hit areas.
 - Buildings must fit existing placement footprints and preserve their click targets.
@@ -105,7 +105,7 @@ Modern military RTS, semi-realistic stylized low-poly: strong recognizable silho
 
 ### Phase 0 — Audit and asset pipeline (this document)
 - Confirmed current source, scene structure, visual placeholders, exact inventory and preservation constraints.
-- Create a model manifest and reusable GLB loading/material pipeline.
+- Create a model manifest and reusable in-engine mesh construction/material palette.
 
 ### Phase 1 — Army visual pack
 - Build and integrate all 14 unit visual variants.
@@ -129,4 +129,4 @@ Modern military RTS, semi-realistic stylized low-poly: strong recognizable silho
 - LODs, instancing, draw-call/material optimization, mobile FPS checks, Android APK build, and before/after visual review.
 
 ## Status
-Phase 0 audit is complete. Phase 1 is the next implementation target. No visual model has yet been integrated into the game at the time this report was written.
+Phase 0 audit is complete. Phase 1 now has 14 role-specific in-engine unit models integrated in the source patch on `iron-front-visual-1.0`. GitHub Actions is validating tests, the production build and Android packaging; physical-phone FPS and visual review remain pending.
