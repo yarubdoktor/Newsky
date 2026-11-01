@@ -1,9 +1,9 @@
-name: Build IRON FRONT APK
+name: Build IRON FRONT 0.6 APK
 on:
   push:
     paths:
       - '.github/workflows/iron-front-inspect.yml'
-      - 'IRON-FRONT-0.4-Ready.zip'
+      - 'IRON-FRONT-0.6-Ready.zip'
   workflow_dispatch:
 jobs:
   build-android:
@@ -15,15 +15,20 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Extract IRON FRONT source
+      - name: Extract IRON FRONT 0.6 source
         run: |
           mkdir -p "$RUNNER_TEMP/iron-front"
-          unzip -q "IRON-FRONT-0.4-Ready.zip" -d "$RUNNER_TEMP/iron-front"
+          unzip -q "IRON-FRONT-0.6-Ready.zip" -d "$RUNNER_TEMP/iron-front"
+          SOURCE_DIR="$(find "$RUNNER_TEMP/iron-front" -type f -name package.json -not -path '*/node_modules/*' -printf '%h\n' | head -n 1)"
+          if [ -z "$SOURCE_DIR" ]; then echo 'ERROR: package.json not found in ZIP'; find "$RUNNER_TEMP/iron-front" -maxdepth 4 -type f | head -n 100; exit 1; fi
+          echo "SOURCE_DIR=$SOURCE_DIR" >> "$GITHUB_ENV"
+          echo "Detected source: $SOURCE_DIR"
       - name: Install web dependencies and build
-        working-directory: ${{ runner.temp }}/iron-front/IRON-FRONT-0.4/SOURCE
         run: |
-          npm ci
+          cd "$SOURCE_DIR"
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
           npm run build
+          test -d dist || { echo 'ERROR: build did not produce dist/'; exit 1; }
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
@@ -31,18 +36,16 @@ jobs:
           java-version: '21'
       - name: Install Android SDK packages
         run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
-          test -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" || test -x "$ANDROID_HOME/cmdline-tools/16.0/bin/sdkmanager"
           SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -n 1)"
+          test -n "$SDKMANAGER"
           yes | "$SDKMANAGER" --licenses
           "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
       - name: Package web game as Android app
-        working-directory: ${{ runner.temp }}/iron-front/IRON-FRONT-0.4/SOURCE
         run: |
+          cd "$SOURCE_DIR"
           npm install @capacitor/core @capacitor/cli @capacitor/android
-          npx cap init "IRON FRONT" "com.yarubdoktor.ironfront" --web-dir dist
-          npx cap add android
+          if [ ! -f capacitor.config.ts ] && [ ! -f capacitor.config.json ] && [ ! -f capacitor.config.js ]; then npx cap init "IRON FRONT" "com.yarubdoktor.ironfront" --web-dir dist; fi
+          if [ ! -d android ]; then npx cap add android; fi
           npx cap sync android
           cd android
           chmod +x gradlew
@@ -50,7 +53,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: IRON-FRONT-0.4-Android-APK
-          path: ${{ runner.temp }}/iron-front/IRON-FRONT-0.4/SOURCE/android/app/build/outputs/apk/debug/app-debug.apk
+          name: IRON-FRONT-0.6-Android-APK
+          path: ${{ env.SOURCE_DIR }}/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
