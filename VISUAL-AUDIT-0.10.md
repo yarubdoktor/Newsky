@@ -129,4 +129,4 @@ Modern military RTS, semi-realistic stylized low-poly: strong recognizable silho
 - LODs, instancing, draw-call/material optimization, mobile FPS checks, Android APK build, and before/after visual review.
 
 ## Status
-Phase 0 audit is complete. Phase 1 now has 14 role-specific in-engine unit models integrated in the source patch on `iron-front-visual-1.0`. GitHub Actions is validating tests, the production build and Android packaging; physical-phone FPS and visual review remain pending.
+Phase 0 audit is complete. Phase 1 now has 14 role-specific in-engine unit models integrated in the source patch on `iron-front-visual-1.0`. GitHub Actions passed the full npm test suite and production web build. Android wrapper/APK packaging is still running; physical-phone FPS and visual review remain pending.
