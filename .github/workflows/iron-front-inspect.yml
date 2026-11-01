@@ -1,4 +1,4 @@
-name: Build IRON FRONT APK (Capacitor)
+name: Build IRON FRONT APK (Capacitor SDK fix)
 on:
   push:
     paths:
@@ -31,6 +31,8 @@ jobs:
           java-version: '21'
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools, platforms;android-35, build-tools;35.0.0'
       - name: Package web game as Android app
         working-directory: ${{ runner.temp }}/iron-front/IRON-FRONT-0.4/SOURCE
         run: |
