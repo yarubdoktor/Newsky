@@ -1,0 +1,93 @@
+--- a/src/game/FortressScene.tsx
++++ b/src/game/FortressScene.tsx
+@@ -1,6 +1,6 @@
+-import { useEffect, useMemo, useRef, useState } from 'react';
++import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+ import { Canvas, useFrame, useThree } from '@react-three/fiber';
+-import { Instance, Instances, Line, OrbitControls } from '@react-three/drei';
++import { Line, OrbitControls, useGLTF } from '@react-three/drei';
+ import * as THREE from 'three';
+ import type { Building, BuildingKind, GameState, Unit, UnitKind } from './types';
+ import { visibleTo } from './visibility';
+@@ -29,11 +29,81 @@
+   });
+   return null;
+ }
++type TreePlacement={x:number;z:number;s:number;r:number};
++function InstancedNature({url,placements}:{url:string;placements:TreePlacement[]}){
++  const {scene}=useGLTF(url);
++  const object=useMemo(()=>{
++    const root=new THREE.Group();scene.updateMatrixWorld(true);
++    scene.traverse(child=>{
++      const source=child as THREE.Mesh;
++      if(!source.isMesh)return;
++      const instanced=new THREE.InstancedMesh(source.geometry,source.material,placements.length);
++      instanced.castShadow=true;instanced.receiveShadow=true;
++      placements.forEach((p,i)=>{
++        const position=new THREE.Vector3(p.x,0,p.z);
++        const rotation=new THREE.Quaternion().setFromEuler(new THREE.Euler(0,p.r,0));
++        const scale=new THREE.Vector3(p.s,p.s,p.s);
++        const matrix=new THREE.Matrix4().compose(position,rotation,scale).multiply(source.matrixWorld);
++        instanced.setMatrixAt(i,matrix);
++      });
++      instanced.instanceMatrix.needsUpdate=true;root.add(instanced);
++    });
++    return root;
++  },[scene,placements]);
++  return <primitive object={object}/>;
++}
++const STRUCTURE_MODELS:Record<BuildingKind,string>={
++  hq:'/assets/3d/base/command-tent.glb',barracks:'/assets/3d/base/squad-tent.glb',
++  power:'/assets/3d/base/generator-trailer.glb',refinery:'/assets/3d/base/fuel-dump-berm.glb',
++  factory:'/assets/3d/base/camo-net-frame.glb',research:'/assets/3d/base/radar-trailer.glb',
++  watchtower:'/assets/3d/base/guard-tower.glb',hospital:'/assets/3d/base/field-hospital-tent.glb',
++  ammo:'/assets/3d/base/storage-container.glb',vehicleFactory:'/assets/3d/base/field-office.glb',
++  airfield:'/assets/3d/base/helipad-marker.glb',missile:'/assets/3d/base/mobile-rocket-launcher.glb',
++  wall:'/assets/3d/base/sandbag-wall-straight.glb',command:'/assets/3d/base/command-vehicle.glb'
++};
++const STRUCTURE_FIT:Record<BuildingKind,[number,number,number]>={
++  hq:[4.8,3.1,4.2],barracks:[3.7,2.2,3.2],power:[2.8,2,2.5],refinery:[4.2,2.4,3.8],
++  factory:[4,2.7,4],research:[3.6,2.7,3.2],watchtower:[2,4.2,2],hospital:[4,2.5,3.8],
++  ammo:[3.3,2.5,2.8],vehicleFactory:[3.6,2.6,3.2],airfield:[4.5,.45,4.5],
++  missile:[3.9,2.2,3],wall:[3,1.35,.9],command:[3.8,2.8,3.2]
++};
++function FittedGLB({url,maxSize,enemy=false}:{url:string;maxSize:[number,number,number];enemy?:boolean}){
++  const {scene}=useGLTF(url);
++  const model=useMemo(()=>{
++    const clone=scene.clone(true);
++    clone.updateMatrixWorld(true);
++    const bounds=new THREE.Box3().setFromObject(clone),size=bounds.getSize(new THREE.Vector3()),center=bounds.getCenter(new THREE.Vector3());
++    const fit=Math.min(maxSize[0]/Math.max(size.x,.001),maxSize[1]/Math.max(size.y,.001),maxSize[2]/Math.max(size.z,.001));
++    clone.scale.setScalar(fit);clone.position.set(-center.x*fit,-bounds.min.y*fit,-center.z*fit);
++    clone.traverse(object=>{
++      const mesh=object as THREE.Mesh;if(!mesh.isMesh)return;
++      mesh.castShadow=true;mesh.receiveShadow=true;
++      const tint=new THREE.Color(enemy?'#c68c82':'#b7c2a8');
++      const tintMaterial=(material:THREE.Material)=>{
++        const copy=material.clone();const standard=copy as THREE.MeshStandardMaterial;
++        if(standard.color)standard.color.multiply(tint);
++        return copy;
++      };
++      mesh.material=Array.isArray(mesh.material)?mesh.material.map(tintMaterial):tintMaterial(mesh.material);
++    });
++    return clone;
++  },[scene,maxSize[0],maxSize[1],maxSize[2],enemy]);
++  return <primitive object={model}/>;
++}
++function SafeFittedGLB({url,maxSize,enemy=false,fallbackSize=[2.4,1.2,2.2]}:{url:string;maxSize:[number,number,number];enemy?:boolean;fallbackSize?:[number,number,number]}){
++  return <Suspense fallback={<Box position={[0,maxSize[1]/2,0]} size={fallbackSize} color={enemy?'#956659':'#657767'}/> }><FittedGLB url={url} maxSize={maxSize} enemy={enemy}/></Suspense>;
++}
++
+ function Terrain({state,rallyMode,onMoveOrder,onSetRally}:{state:GameState;rallyMode:boolean;
+   onMoveOrder:(x:number,z:number)=>void;onSetRally:(x:number,z:number)=>void}) {
+   const trees=useMemo(()=>Array.from({length:110},(_,i)=>({x:Math.sin(i*17.31)*52+23,z:Math.cos(i*9.17)*24,
+     s:.7+(i%4)*.18})).filter(p=>!(p.x<1&&p.x>-25&&p.z>-4&&p.z<13)&&
+       !(p.x>45&&p.x<71&&p.z<5&&p.z>-13)&&Math.abs(p.x-RIVER_X)>3.6),[]);
++  const forestTrees=useMemo(()=>trees.filter((_,i)=>i%2===0).map((t,i)=>({x:t.x,z:t.z,s:.13*t.s,r:(i%7)*.73})),[trees]);
++  const oakTrees=useMemo(()=>forestTrees.filter((_,i)=>i%3===0),[forestTrees]);
++  const sycamoreTrees=useMemo(()=>forestTrees.filter((_,i)=>i%3===1),[forestTrees]);
++  const spruceTrees=useMemo(()=>forestTrees.filter((_,i)=>i%3===2),[forestTrees]);
++  const snowTrees=useMemo(()=>forestTrees.map(p=>({...p,s:p.s*1.05})),[forestTrees]);
+   const color=state.biome==='snow'?'#c0ccc8':state.biome==='desert'?'#a18b65':'#4b6150';
+   /** Thin translucent strip between two ground points: the dedicated haul roads. */
+   const strip=(ax:number,az:number,bx:number,bz:number,w=.8,opacity=.3)=>{
