@@ -21,12 +21,13 @@ jobs:
           mkdir -p "$RUNNER_TEMP/iron-front-09"
           unzip -t "IRON-FRONT-0.9-SOURCE.zip"
           unzip -q "IRON-FRONT-0.9-SOURCE.zip" -d "$RUNNER_TEMP/iron-front-09"
-          SOURCE_DIR="$(find "$RUNNER_TEMP/iron-front-09" -type f -name package.json -not -path '*/node_modules/*' -printf '%h\\n' | head -n 1)"
-          if [ -z "$SOURCE_DIR" ]; then
+          PACKAGE_JSON="$(find "$RUNNER_TEMP/iron-front-09" -type f -name package.json -not -path '*/node_modules/*' | head -n 1)"
+          if [ -z "$PACKAGE_JSON" ]; then
             echo 'ERROR: package.json not found in 0.9 source archive'
             find "$RUNNER_TEMP/iron-front-09" -maxdepth 4 -type f | head -n 120
             exit 1
           fi
+          SOURCE_DIR="$(dirname "$PACKAGE_JSON")"
           echo "SOURCE_DIR=$SOURCE_DIR" >> "$GITHUB_ENV"
           echo "Building from untouched 0.9 source: $SOURCE_DIR"
           test -f "$SOURCE_DIR/src/game/FortressScene.tsx"
