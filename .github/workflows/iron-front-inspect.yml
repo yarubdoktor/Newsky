@@ -88,21 +88,23 @@ jobs:
           ./gradlew assembleDebug
       - name: Verify APK output
         run: |
+          set -euo pipefail
           APK="$SOURCE_DIR/android/app/build/outputs/apk/debug/app-debug.apk"
           test -s "$APK"
           ls -lh "$APK"
           cp "$APK" "$RUNNER_TEMP/IRON-FRONT-0.11-VISUAL-TEST.apk"
+          test -s "$RUNNER_TEMP/IRON-FRONT-0.11-VISUAL-TEST.apk"
       - name: Upload 0.11 visual test APK
         uses: actions/upload-artifact@v4
         with:
           name: IRON-FRONT-0.11-VISUAL-APK
-          path: \${{ runner.temp }}/IRON-FRONT-0.11-VISUAL-TEST.apk
+          path: ${{ runner.temp }}/IRON-FRONT-0.11-VISUAL-TEST.apk
           if-no-files-found: error
           retention-days: 14
       - name: Upload 0.11 visual source archive
         uses: actions/upload-artifact@v4
         with:
           name: IRON-FRONT-0.11-VISUAL-SOURCE
-          path: \${{ runner.temp }}/IRON-FRONT-0.11-VISUAL-SOURCE.zip
+          path: ${{ runner.temp }}/IRON-FRONT-0.11-VISUAL-SOURCE.zip
           if-no-files-found: error
           retention-days: 14
