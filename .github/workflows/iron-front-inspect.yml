@@ -1,4 +1,4 @@
-name: Inspect IRON FRONT 0.9 source
+name: Compare IRON FRONT 0.9 changes against 0.8
 on:
   push:
     paths:
@@ -7,36 +7,68 @@ on:
       - 'IRON-FRONT-0.8-Ready.zip'
   workflow_dispatch:
 jobs:
-  inspect-source:
+  compare-source:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Validate and inventory source archives
+      - name: Compare source trees and identify control changes
         run: |
-          set -e
-          mkdir -p inspection
-          for archive in IRON-FRONT-0.9-SOURCE.zip IRON-FRONT-0.8-Ready.zip; do
-            echo "===== $archive =====" | tee -a inspection/source-report.txt
-            if [ ! -f "$archive" ]; then echo "MISSING ARCHIVE" | tee -a inspection/source-report.txt; continue; fi
-            stat -c 'Size: %s bytes' "$archive" | tee -a inspection/source-report.txt
-            if unzip -t "$archive" >> inspection/source-report.txt 2>&1; then echo "ZIP integrity: PASS" | tee -a inspection/source-report.txt; else echo "ZIP integrity: FAIL" | tee -a inspection/source-report.txt; exit 1; fi
-            echo "File count: $(unzip -Z1 "$archive" | wc -l)" | tee -a inspection/source-report.txt
-            echo "Top-level inventory:" | tee -a inspection/source-report.txt
-            unzip -Z1 "$archive" | head -n 160 | tee -a inspection/source-report.txt
-            echo "Important project files:" | tee -a inspection/source-report.txt
-            unzip -Z1 "$archive" | grep -Ei '(^|/)(package\.json|package-lock\.json|index\.html|vite\.config\.|src/|public/|assets/|android/|capacitor\.config\.|README|CHANGELOG)' | head -n 160 | tee -a inspection/source-report.txt || true
-            echo "" | tee -a inspection/source-report.txt
-          done
+          set -euo pipefail
           mkdir -p inspection/v08 inspection/v09
           unzip -q IRON-FRONT-0.8-Ready.zip -d inspection/v08
           unzip -q IRON-FRONT-0.9-SOURCE.zip -d inspection/v09
-          echo "===== Detected root project markers =====" | tee -a inspection/source-report.txt
-          find inspection/v08 inspection/v09 -type f \( -name package.json -o -name index.html -o -name vite.config.js -o -name vite.config.ts -o -name README.md \) | sort | tee -a inspection/source-report.txt
-      - name: Upload inspection report
+          BASE="inspection/v08/IRON-FRONT-0.8/SOURCE"
+          NEW="inspection/v09"
+          test -d "$BASE"
+          test -f "$NEW/package.json"
+          {
+            echo "IRON FRONT 0.9 vs 0.8 SOURCE COMPARISON"
+            echo "0.8 source root: $BASE"
+            echo "0.9 source root: $NEW"
+            echo
+            echo "=== CHANGE DOCUMENTS ==="
+            for f in CHANGES-0.9.md TEST-REPORT.md FEATURE-STATUS.md progress.md; do
+              if [ -f "$NEW/$f" ]; then
+                echo "--- $f ---"
+                sed -n '1,240p' "$NEW/$f"
+              fi
+            done
+            echo
+            echo "=== FILE STATUS (A=added, D=removed, M=modified) ==="
+            diff -qr "$BASE" "$NEW" || true
+            echo
+            echo "=== CONTENT DIFFS FOR GAME / INPUT / UI FILES ==="
+            find "$NEW/src" -type f | sort | while read -r f; do
+              rel="${f#$NEW/}"
+              old="$BASE/$rel"
+              if [ -f "$old" ] && ! cmp -s "$old" "$f"; then
+                case "$rel" in
+                  src/App.tsx|src/style.css|src/game/*)
+                    echo "--- DIFF $rel ---"
+                    diff -u "$old" "$f" || true
+                    ;;
+                esac
+              elif [ ! -f "$old" ]; then
+                echo "--- NEW FILE $rel ---"
+                sed -n '1,220p' "$f"
+              fi
+            done
+            echo
+            echo "=== PACKAGE CONFIG COMPARISON ==="
+            diff -u "$BASE/package.json" "$NEW/package.json" || true
+            echo
+            echo "=== 0.8 AND 0.9 ROOT STRUCTURE ==="
+            find "$BASE" -maxdepth 2 -type f | sort
+            echo "--- 0.9 ---"
+            find "$NEW" -maxdepth 2 -type f | sort
+          } > inspection/merge-analysis.txt
+          echo "Comparison generated."
+          sed -n '1,260p' inspection/merge-analysis.txt
+      - name: Upload comparison report
         uses: actions/upload-artifact@v4
         with:
-          name: IRON-FRONT-0.9-Source-Inspection
-          path: inspection/source-report.txt
+          name: IRON-FRONT-0.9-Merge-Analysis
+          path: inspection/merge-analysis.txt
           if-no-files-found: error
           retention-days: 14
