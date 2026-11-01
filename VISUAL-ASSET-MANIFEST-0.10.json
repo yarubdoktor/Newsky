@@ -78,7 +78,7 @@
     {
       "phase": 1,
       "name": "Army visual pack",
-      "status": "implemented_pending_build_verification",
+      "status": "web_tests_and_build_passed_android_packaging_pending",
       "assets": 14
     },
     {
