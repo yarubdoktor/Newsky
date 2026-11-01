@@ -1,0 +1,196 @@
+--- a/src/game/FortressScene.tsx
++++ b/src/game/FortressScene.tsx
+@@ -6,6 +6,8 @@
+ import { visibleTo } from './visibility';
+ import { UNIT_SPECS } from './unitSystem';
+ import { rocks, mountains, bridges, RIVER_X } from './navigation';
++import { UnitVisual } from './UnitModels';
++
+ 
+ function Box({position=[0,0,0],size=[1,1,1],color='#758880'}:{
+   position?:[number,number,number];size?:[number,number,number];color?:string}) {
+@@ -121,23 +123,14 @@
+ }
+ function UnitMesh({unit,onSelect,onSelectKind}:{unit:Unit;onSelect:(id:number,enemy:boolean,multi:boolean)=>void;onSelectKind:(kind:UnitKind)=>void}) {
+   const enemy=unit.faction==='enemy',spec=UNIT_SPECS[unit.kind],vehicle=spec.armor>=2,
+-    air=!!spec.air,color=enemy?'#b86f5d':'#a4b58c',rotation=Math.atan2(unit.targetX-unit.x,unit.targetZ-unit.z);
++    air=!!spec.air,rotation=Math.atan2(unit.targetX-unit.x,unit.targetZ-unit.z);
+   return <group position={[unit.x,air?2.7:.1,unit.z]} onClick={e=>{e.stopPropagation();if(e.delta>6)return;onSelect(unit.id,enemy,!!(e.nativeEvent as PointerEvent).shiftKey);}}
+     onDoubleClick={e=>{e.stopPropagation();if(!enemy)onSelectKind(unit.kind);}}>
+-    {/* Invisible, finger-sized hit area: small soldiers are easy to tap. */}
++    {/* Original touch target remains independent of the visual model. */}
+     <mesh position={[0,.6,0]}><cylinderGeometry args={[vehicle?1.3:.9,vehicle?1.3:.9,1.4,10]}/><meshBasicMaterial transparent opacity={0} depthWrite={false}/></mesh>
+-    <group rotation={[0,rotation,0]}>
+-      <Box position={[0,.35,0]} size={air?[.6,.4,1.7]:vehicle?[1.2,.5,1.8]:[.35,.65,.3]} color={color}/>
+-      {vehicle&&!air&&<><Box position={[-.64,.18,0]} size={[.25,.3,1.9]} color="#293c33"/><Box position={[.64,.18,0]} size={[.25,.3,1.9]} color="#293c33"/>
+-        <Box position={[0,.72,-.1]} size={unit.kind==='artillery'?[.6,.5,1.2]:[.65,.35,.7]} color={enemy?'#865144':'#6c845f'}/>
+-        <Box position={[0,.77,.8]} size={[.12,.12,unit.kind==='artillery'?2.3:1.5]} color="#304139"/></>}
+-      {!vehicle&&!air&&<><mesh position={[0,.89,0]}><sphereGeometry args={[.2,8,6]}/><meshStandardMaterial color={enemy?'#b7a089':'#d1c49e'}/></mesh>
+-        <Box position={[.22,.5,.2]} size={[.1,.1,unit.kind==='sniper'?.9:.5]} color="#26372d"/>
+-        {unit.kind==='antitank'&&<Box position={[.22,.73,0]} size={[.18,.18,.9]} color="#495a37"/>}</>}
+-      {air&&<><Box position={[0,.7,0]} size={unit.kind==='helicopter'?[3.5,.06,.18]:[2.4,.08,.2]} color="#c3ccb2"/><Box position={[0,.4,-1.1]} size={[1,.12,.25]} color="#a4b58c"/></>}
+-    </group>
++    <group rotation={[0,rotation,0]}><UnitVisual kind={unit.kind} enemy={enemy}/></group>
+     <mesh rotation={[-Math.PI/2,0,0]} position={[0,.03,0]}><ringGeometry args={[vehicle?.9:.5,vehicle?1:.6,20]}/><meshBasicMaterial color={unit.selected?'#85e2d1':enemy?'#ef9b85':'#c4d6a8'} transparent opacity={unit.selected?1:.45}/></mesh>
+-    <group position={[0,1.5,0]}><mesh><planeGeometry args={[.95,.09]}/><meshBasicMaterial color="#152b22"/></mesh>
++    <group position={[0,1.85,0]}><mesh><planeGeometry args={[.95,.09]}/><meshBasicMaterial color="#152b22"/></mesh>
+       <mesh position={[-.475*(1-unit.hp/unit.maxHp),0,.002]}><planeGeometry args={[.95*unit.hp/unit.maxHp,.065]}/><meshBasicMaterial color={enemy?'#ed9b8e':'#a3e1ac'}/></mesh></group>
+   </group>;
+ }
+--- /dev/null
++++ b/src/game/UnitModels.tsx
+@@ -0,0 +1,138 @@
++import { useRef } from 'react';
++import { Instance, Instances } from '@react-three/drei';
++import { useFrame } from '@react-three/fiber';
++import * as THREE from 'three';
++import type { UnitKind } from './types';
++
++type V3=[number,number,number];
++function Part({p=[0,0,0],s=[1,1,1],c='#647653',r=[0,0,0],metal=0,rough=.78}:{p?:V3;s?:V3;c?:string;r?:V3;metal?:number;rough?:number}){
++  return <mesh position={p} scale={s} rotation={r} castShadow receiveShadow>
++    <boxGeometry args={[1,1,1]}/><meshStandardMaterial color={c} metalness={metal} roughness={rough}/>
++  </mesh>;
++}
++function Round({p=[0,0,0],s=[1,1,1],c='#647653',metal=0,rough=.72}:{p?:V3;s?:V3;c?:string;metal?:number;rough?:number}){
++  return <mesh position={p} scale={s} castShadow receiveShadow>
++    <sphereGeometry args={[.5,10,8]}/><meshStandardMaterial color={c} metalness={metal} roughness={rough}/>
++  </mesh>;
++}
++function Barrel({p=[0,0,0],length=1,radius=.06,c='#39443b',rotation=[Math.PI/2,0,0]}:{p?:V3;length?:number;radius?:number;c?:string;rotation?:V3}){
++  return <mesh position={p} rotation={rotation} castShadow>
++    <cylinderGeometry args={[radius,radius,length,10]}/><meshStandardMaterial color={c} metalness={.55} roughness={.48}/>
++  </mesh>;
++}
++function Soldier({kind,body,dark,accent}:{kind:UnitKind;body:string;dark:string;accent:string}){
++  const worker=kind==='worker',sniper=kind==='sniper',engineer=kind==='engineer',anti=kind==='antitank';
++  return <group>
++    <Part p={[-.17,.29,0]} s={[.18,.5,.24]} c={dark}/><Part p={[.17,.29,0]} s={[.18,.5,.24]} c={dark}/>
++    <Part p={[-.17,.07,.07]} s={[.22,.12,.34]} c="#202725"/><Part p={[.17,.07,.07]} s={[.22,.12,.34]} c="#202725"/>
++    <Part p={[0,.83,0]} s={[.53,.58,.31]} c={body}/>
++    <Part p={[0,.87,.19]} s={[.48,.32,.08]} c={dark}/>
++    <Part p={[0,1.04,.24]} s={[.18,.12,.06]} c={accent}/>
++    <Part p={[-.34,.82,.03]} s={[.17,.48,.19]} c={body} r={[0,0,-.22]}/>
++    <Part p={[.34,.82,.03]} s={[.17,.48,.19]} c={body} r={[0,0,.22]}/>
++    <Round p={[0,1.28,0]} s={[.28,.3,.25]} c="#b48b6d"/>
++    <Round p={[0,1.43,0]} s={[.34,.19,.31]} c={worker?accent:dark}/>
++    <Part p={[0,1.37,.17]} s={[.42,.07,.12]} c={dark}/>
++    <Part p={[0,.88,-.23]} s={[.36,.44,.18]} c={engineer?accent:dark}/>
++    <Part p={[0,.99,-.34]} s={[.42,.26,.12]} c={worker?'#b39b68':body}/>
++    {worker?<><Part p={[0,1.1,.19]} s={[.56,.14,.1]} c="#d4ad4d"/><Barrel p={[.38,.47,.36]} length={.9} radius={.035} c="#765f3e"/><Part p={[.38,.91,.72]} s={[.28,.12,.12]} c="#505b53"/></>:
++      <><Part p={[.2,.63,.32]} s={[.12,.12,.72]} c="#303a35" r={[.12,0,-.06]}/><Barrel p={[.2,.62,.75]} length={1.0} radius={.025} c="#252d2a"/>
++        {sniper&&<><Part p={[.2,.73,.58]} s={[.07,.09,.28]} c={accent}/><Part p={[.2,.66,.83]} s={[.11,.08,.2]} c="#1f2928"/></>}
++        {engineer&&<><Part p={[-.28,1.05,-.32]} s={[.22,.34,.2]} c={accent}/><Part p={[-.28,1.23,-.33]} s={[.26,.07,.22]} c="#3a4b42"/></>}
++        {anti&&<><Part p={[-.28,1.08,.05]} s={[.22,.22,.38]} c={dark}/><Barrel p={[-.28,1.07,.57]} length={1.25} radius={.09} c="#46534b"/><Round p={[-.28,1.07,1.2]} s={[.18,.18,.18]} c={accent}/></>}
++      </>}
++    <Part p={[-.48,.96,-.05]} s={[.08,.2,.12]} c={accent}/>
++  </group>;
++}
++function Wheels({count=4,length=1.5,width=1.65}:{count?:number;length?:number;width?:number}){
++  return <Instances limit={count*2} castShadow>
++    <cylinderGeometry args={[.22,.22,.16,12]}/><meshStandardMaterial color="#202526" roughness={.98}/>
++    {Array.from({length:count},(_,i)=>[-1,1].map(side=><Instance key={String(i)+':'+String(side)} position={[side*width/2,.25,-length/2+i*(length/(count-1||1))]} rotation={[0,0,Math.PI/2]}/>))}
++  </Instances>;
++}
++function TrackedVehicle({kind,body,dark,accent}:{kind:UnitKind;body:string;dark:string;accent:string}){
++  const heavy=kind==='heavy',artillery=kind==='artillery';
++  return <group>
++    <Part p={[0,.56,0]} s={[1.55,.62,2.55]} c={body}/>
++    <Part p={[0,.91,-.1]} s={[1.35,.22,2.15]} c={dark}/>
++    <Part p={[-.92,.34,0]} s={[.28,.58,2.35]} c="#242b2a"/><Part p={[.92,.34,0]} s={[.28,.58,2.35]} c="#242b2a"/>
++    <Wheels count={5} length={1.95} width={1.9}/>
++    <Round p={[0,1.13,-.12]} s={[heavy?1.0:.8,.42,.85]} c={dark}/><Part p={[0,1.34,-.17]} s={[1.0,.42,.92]} c={body}/>
++    <Barrel p={[0,1.34,heavy?1.15:1.02]} length={artillery?2.3:heavy?2.0:1.65} radius={artillery?.11:.075} c="#303a36"/>
++    <Part p={[0,1.34,heavy?2.08:1.82]} s={[.24,.22,.2]} c="#242b29"/>
++    {heavy&&<><Part p={[-.54,1.45,-.55]} s={[.22,.22,.72]} c={accent}/><Part p={[.54,1.45,-.55]} s={[.22,.22,.72]} c={accent}/><Part p={[0,1.62,-.32]} s={[.48,.12,.3]} c={dark}/></>}
++    {artillery&&<><Part p={[0,1.55,-.4]} s={[.8,.22,.72]} c={accent}/><Part p={[0,.22,-1.1]} s={[.16,.36,.3]} c="#333b37"/></>}
++    <Part p={[-.52,.85,1.03]} s={[.16,.14,.12]} c="#e2c27a"/><Part p={[.52,.85,1.03]} s={[.16,.14,.12]} c="#e2c27a"/>
++    <Part p={[0,.9,-1.27]} s={[.42,.12,.12]} c="#8f4b42"/>
++  </group>;
++}
++function WheeledVehicle({kind,body,dark,accent}:{kind:UnitKind;body:string;dark:string;accent:string}){
++  const apc=kind==='apc';
++  return <group>
++    <Part p={[0,.58,0]} s={[1.55,.62,2.45]} c={body}/>
++    <Part p={[0,.95,-.12]} s={[1.35,.5,1.45]} c={dark}/>
++    <Part p={[0,1.2,.4]} s={[.95,.16,.45]} c="#253332"/>
++    <Wheels count={4} length={1.75} width={1.7}/>
++    <Part p={[0,.18,-.9]} s={[.8,.14,.12]} c="#2c3331"/>
++    {apc?<><Round p={[0,1.28,-.1]} s={[.28,.2,.28]} c={accent}/><Barrel p={[0,1.3,.34]} length={.95} radius={.045} c="#303b37"/><Part p={[0,1.48,-.2]} s={[.12,.18,.18]} c="#252d2a"/></>:
++      <><Part p={[0,1.3,-.52]} s={[1.08,.5,.76]} c={dark}/><Part p={[0,1.56,-.52]} s={[.86,.08,.62]} c="#28404a"/><Round p={[0,1.82,-.35]} s={[.13,.13,.13]} c="#c2b17a"/></>}
++    <Part p={[-.52,.9,1.18]} s={[.16,.13,.1]} c="#e4c77b"/><Part p={[.52,.9,1.18]} s={[.16,.13,.1]} c="#e4c77b"/>
++  </group>;
++}
++function Truck({kind,body,dark,accent}:{kind:UnitKind;body:string;dark:string;accent:string}){
++  const hauler=kind==='hauler';
++  return <group>
++    <Part p={[0,.48,0]} s={[1.3,.28,2.65]} c="#343b37"/>
++    <Part p={[0,.95,-.67]} s={[1.28,.92,.95]} c={body}/>
++    <Part p={[0,1.18,-.17]} s={[1.12,.42,.1]} c="#28434a"/>
++    <Part p={[0,1.38,-.7]} s={[.22,.12,.08]} c={accent}/>
++    <Part p={[0,.98,.65]} s={[1.38,.72,1.35]} c={hauler?'#65716a':'#77765c'}/>
++    {hauler?<><Part p={[0,1.36,.65]} s={[1.42,.12,1.4]} c={dark}/><Part p={[-.65,.94,.65]} s={[.12,.82,1.42]} c="#424b46"/><Part p={[.65,.94,.65]} s={[.12,.82,1.42]} c="#424b46"/></>:
++      <><Part p={[0,1.39,.65]} s={[1.2,.1,1.15]} c={accent}/><Part p={[-.5,1.17,.65]} s={[.08,.28,1.2]} c={dark}/><Part p={[.5,1.17,.65]} s={[.08,.28,1.2]} c={dark}/></>}
++    <Wheels count={3} length={2.0} width={1.5}/>
++    <Part p={[-.48,.8,-1.12]} s={[.18,.13,.1]} c="#e4c77b"/><Part p={[.48,.8,-1.12]} s={[.18,.13,.1]} c="#e4c77b"/>
++  </group>;
++}
++function Helicopter({body,dark,accent}:{body:string;dark:string;accent:string}){
++  const rotor=useRef<THREE.Group>(null),tail=useRef<THREE.Group>(null);
++  useFrame((_,dt)=>{if(rotor.current)rotor.current.rotation.y+=dt*17;if(tail.current)tail.current.rotation.x+=dt*20;});
++  return <group>
++    <Round p={[0,.88,0]} s={[.62,.55,1.12]} c={body}/>
++    <Round p={[0,1.02,.58]} s={[.49,.38,.55]} c="#29444c" metal={.2}/>
++    <Part p={[0,.88,-1.05]} s={[.2,.2,2.1]} c={dark}/><Part p={[0,1.28,-1.78]} s={[.14,.68,.22]} c={accent}/>
++    <Part p={[-.56,.45,-.08]} s={[.12,.1,1.45]} c={dark}/><Part p={[.56,.45,-.08]} s={[.12,.1,1.45]} c={dark}/>
++    <Part p={[-.36,.65,.22]} s={[.09,.45,.1]} c="#59645b"/><Part p={[.36,.65,.22]} s={[.09,.45,.1]} c="#59645b"/>
++    <Part p={[-.35,.55,.65]} s={[.18,.16,.65]} c={dark}/><Part p={[.35,.55,.65]} s={[.18,.16,.65]} c={dark}/>
++    <group ref={rotor} position={[0,1.48,0]}><Barrel p={[0,.05,0]} length={.3} radius={.08} rotation={[0,0,0]} c="#303936"/><Part p={[0,.08,0]} s={[4.1,.045,.12]} c="#27322e"/><Part p={[0,.08,0]} s={[.12,.045,4.1]} c="#27322e"/></group>
++    <group ref={tail} position={[0,1.25,-1.85]}><Part p={[0,0,0]} s={[.82,.06,.07]} c="#27322e"/><Part p={[0,0,0]} s={[.07,.82,.07]} c="#27322e"/></group>
++    <Barrel p={[-.5,.56,.7]} length={.42} radius={.07} rotation={[Math.PI/2,0,0]} c={accent}/><Barrel p={[.5,.56,.7]} length={.42} radius={.07} rotation={[Math.PI/2,0,0]} c={accent}/>
++  </group>;
++}
++function Drone({body,dark,accent}:{body:string;dark:string;accent:string}){
++  const rotors=useRef<THREE.Group>(null);
++  useFrame((_,dt)=>{if(rotors.current)rotors.current.rotation.y+=dt*22;});
++  return <group>
++    <Part p={[0,.58,0]} s={[.48,.22,.62]} c={body}/><Round p={[0,.42,.26]} s={[.2,.14,.2]} c="#29444c"/>
++    {[-1,1].flatMap(x=>[-1,1].map(z=><group key={String(x)+':'+String(z)} position={[x*.62,.58,z*.62]}>
++      <Part p={[-x*.3,0,-z*.3]} s={[.72,.08,.08]} c={dark} r={[0,-Math.PI/4*x*z,0]}/>
++      <Round p={[0,.1,0]} s={[.16,.08,.16]} c={accent}/>
++    </group>))}
++    <group ref={rotors}>{[-1,1].flatMap(x=>[-1,1].map(z=><group key={String(x)+':'+String(z)} position={[x*.62,.72,z*.62]}>
++      <Part p={[0,0,0]} s={[.64,.025,.06]} c="#29312f"/><Part p={[0,0,0]} s={[.06,.025,.64]} c="#29312f"/>
++    </group>))}</group>
++  </group>;
++}
++export function UnitVisual({kind,enemy}:{kind:UnitKind;enemy:boolean}){
++  const body=enemy?'#9b594d':'#647653',dark=enemy?'#543a35':'#344536',accent=enemy?'#c08a70':'#b59a62';
++  const human=['infantry','sniper','engineer','antitank','worker'].includes(kind);
++  const scale:Record<UnitKind,number>={infantry:.92,sniper:.92,engineer:.92,antitank:.92,worker:.92,scout:.76,tank:.76,heavy:.72,apc:.72,artillery:.74,helicopter:.82,drone:.88,supply:.72,hauler:.72};
++  const airborne=kind==='helicopter'||kind==='drone';
++  return <group position={[0,airborne?0:-.1,0]} scale={scale[kind]}>
++    {human?<Soldier kind={kind} body={body} dark={dark} accent={accent}/>:null}
++    {['tank','heavy','artillery'].includes(kind)?<TrackedVehicle kind={kind} body={body} dark={dark} accent={accent}/>:null}
++    {kind==='apc'||kind==='scout'?<WheeledVehicle kind={kind} body={body} dark={dark} accent={accent}/>:null}
++    {kind==='supply'||kind==='hauler'?<Truck kind={kind} body={body} dark={dark} accent={accent}/>:null}
++    {kind==='helicopter'?<Helicopter body={body} dark={dark} accent={accent}/>:null}
++    {kind==='drone'?<Drone body={body} dark={dark} accent={accent}/>:null}
++  </group>;
++}
+--- /dev/null
++++ b/CHANGES-0.11.md
+@@ -0,0 +1,13 @@
++# IRON-FRONT 0.11 — Army visual pack (Phase 1)
++
++- Replaced the single generic unit silhouette with 14 role-specific 3D mesh models: four combat infantry roles plus laborer, scout vehicle, main tank, heavy tank, APC, self-propelled artillery, attack helicopter, recon drone, supply truck and haul truck.
++- Added faction-specific body palettes while keeping glass, metal, rubber, equipment and lights visually distinct.
++- Added track/wheel assemblies, turrets and barrels, vehicle cabins/cargo, soldier equipment and weapons, helicopter rotor animation and drone rotor animation.
++- Kept the original invisible touch hit areas, selection rings, health bars, unit IDs, unit kinds, coordinates, movement, selection, combat, navigation and camera controls unchanged.
++- These are lightweight in-engine mesh models; they add no remote downloads or external runtime asset dependency.
++
++## Verification status
++
++- Source patch applies cleanly to the 0.10 source archive.
++- TypeScript/JSX syntax transpilation passed for the modified scene and new model module.
++- Full npm tests, production build, Android APK build and device FPS/playability verification are pending the GitHub Actions run and phone test.
