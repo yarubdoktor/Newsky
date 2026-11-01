@@ -1,74 +1,76 @@
-name: Compare IRON FRONT 0.9 changes against 0.8
+name: Build IRON FRONT 0.9 Android APK
 on:
   push:
     paths:
       - '.github/workflows/iron-front-inspect.yml'
       - 'IRON-FRONT-0.9-SOURCE.zip'
-      - 'IRON-FRONT-0.8-Ready.zip'
   workflow_dispatch:
 jobs:
-  compare-source:
+  build-android:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Compare source trees and identify control changes
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Extract original 0.9 source only
         run: |
           set -euo pipefail
-          mkdir -p inspection/v08 inspection/v09
-          unzip -q IRON-FRONT-0.8-Ready.zip -d inspection/v08
-          unzip -q IRON-FRONT-0.9-SOURCE.zip -d inspection/v09
-          BASE="inspection/v08/IRON-FRONT-0.8/SOURCE"
-          NEW="inspection/v09"
-          test -d "$BASE"
-          test -f "$NEW/package.json"
-          {
-            echo "IRON FRONT 0.9 vs 0.8 SOURCE COMPARISON"
-            echo "0.8 source root: $BASE"
-            echo "0.9 source root: $NEW"
-            echo
-            echo "=== CHANGE DOCUMENTS ==="
-            for f in CHANGES-0.9.md TEST-REPORT.md FEATURE-STATUS.md progress.md; do
-              if [ -f "$NEW/$f" ]; then
-                echo "--- $f ---"
-                sed -n '1,240p' "$NEW/$f"
-              fi
-            done
-            echo
-            echo "=== FILE STATUS (A=added, D=removed, M=modified) ==="
-            diff -qr "$BASE" "$NEW" || true
-            echo
-            echo "=== CONTENT DIFFS FOR GAME / INPUT / UI FILES ==="
-            find "$NEW/src" -type f | sort | while read -r f; do
-              rel="${f#$NEW/}"
-              old="$BASE/$rel"
-              if [ -f "$old" ] && ! cmp -s "$old" "$f"; then
-                case "$rel" in
-                  src/App.tsx|src/style.css|src/game/*)
-                    echo "--- DIFF $rel ---"
-                    diff -u "$old" "$f" || true
-                    ;;
-                esac
-              elif [ ! -f "$old" ]; then
-                echo "--- NEW FILE $rel ---"
-                sed -n '1,220p' "$f"
-              fi
-            done
-            echo
-            echo "=== PACKAGE CONFIG COMPARISON ==="
-            diff -u "$BASE/package.json" "$NEW/package.json" || true
-            echo
-            echo "=== 0.8 AND 0.9 ROOT STRUCTURE ==="
-            find "$BASE" -maxdepth 2 -type f | sort
-            echo "--- 0.9 ---"
-            find "$NEW" -maxdepth 2 -type f | sort
-          } > inspection/merge-analysis.txt
-          echo "Comparison generated."
-          sed -n '1,260p' inspection/merge-analysis.txt
-      - name: Upload comparison report
+          mkdir -p "$RUNNER_TEMP/iron-front-09"
+          unzip -t "IRON-FRONT-0.9-SOURCE.zip"
+          unzip -q "IRON-FRONT-0.9-SOURCE.zip" -d "$RUNNER_TEMP/iron-front-09"
+          SOURCE_DIR="$(find "$RUNNER_TEMP/iron-front-09" -type f -name package.json -not -path '*/node_modules/*' -printf '%h\\n' | head -n 1)"
+          if [ -z "$SOURCE_DIR" ]; then
+            echo 'ERROR: package.json not found in 0.9 source archive'
+            find "$RUNNER_TEMP/iron-front-09" -maxdepth 4 -type f | head -n 120
+            exit 1
+          fi
+          echo "SOURCE_DIR=$SOURCE_DIR" >> "$GITHUB_ENV"
+          echo "Building from untouched 0.9 source: $SOURCE_DIR"
+          test -f "$SOURCE_DIR/src/game/FortressScene.tsx"
+          test -f "$SOURCE_DIR/src/App.tsx"
+      - name: Install dependencies and build 0.9 web game
+        run: |
+          set -euo pipefail
+          cd "$SOURCE_DIR"
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+          npm run build
+          test -f dist/index.html
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install Android SDK packages
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -n 1)"
+          test -n "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses
+          "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+      - name: Create temporary Android wrapper outside repository
+        run: |
+          set -euo pipefail
+          cd "$SOURCE_DIR"
+          npm install @capacitor/core @capacitor/cli @capacitor/android
+          npx cap init "IRON FRONT 0.9" "com.yarubdoktor.ironfront09" --web-dir dist
+          npx cap add android
+          npx cap sync android
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+      - name: Verify APK output
+        run: |
+          APK="$SOURCE_DIR/android/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          ls -lh "$APK"
+          cp "$APK" "$RUNNER_TEMP/IRON-FRONT-0.9-TEST.apk"
+      - name: Upload 0.9 test APK
         uses: actions/upload-artifact@v4
         with:
-          name: IRON-FRONT-0.9-Merge-Analysis
-          path: inspection/merge-analysis.txt
+          name: IRON-FRONT-0.9-TEST-APK
+          path: ${{ runner.temp }}/IRON-FRONT-0.9-TEST.apk
           if-no-files-found: error
           retention-days: 14
