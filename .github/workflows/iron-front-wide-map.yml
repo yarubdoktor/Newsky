@@ -1,0 +1,98 @@
+name: Build IRON FRONT 0.15 Wide Map APK
+on:
+  push:
+    paths:
+      - '.github/workflows/iron-front-wide-map.yml'
+      - 'IRON-FRONT-0_15-WIDE-MAP-SOURCE.zip'
+  workflow_dispatch:
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: ''
+      - name: Validate and extract uploaded 0.15 source
+        run: |
+          set -euo pipefail
+          SOURCE_ZIP="IRON-FRONT-0_15-WIDE-MAP-SOURCE.zip"
+          test -s "$SOURCE_ZIP"
+          unzip -t "$SOURCE_ZIP"
+          mkdir -p "$RUNNER_TEMP/iron-front-wide-map"
+          unzip -q "$SOURCE_ZIP" -d "$RUNNER_TEMP/iron-front-wide-map"
+          PACKAGE_JSON="$(find "$RUNNER_TEMP/iron-front-wide-map" -type f -name package.json -not -path '*/node_modules/*' | head -n 1)"
+          if [ -z "$PACKAGE_JSON" ]; then
+            echo "ERROR: package.json missing from uploaded source"
+            find "$RUNNER_TEMP/iron-front-wide-map" -maxdepth 4 -type f | head -n 160
+            exit 1
+          fi
+          SOURCE_DIR="$(dirname "$PACKAGE_JSON")"
+          echo "SOURCE_DIR=$SOURCE_DIR" >> "$GITHUB_ENV"
+          echo "Using uploaded source: $SOURCE_DIR"
+          test -f "$SOURCE_DIR/src/main.tsx"
+          test -f "$SOURCE_DIR/src/game/FortressScene.tsx"
+          test -f "$SOURCE_DIR/index.html"
+          test -d "$SOURCE_DIR/public/assets/3d"
+      - name: Install dependencies, run available tests and build web game
+        run: |
+          set -euo pipefail
+          cd "$SOURCE_DIR"
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+          node -e "const p=require('./package.json'); console.log('Scripts:',p.scripts); if(!p.scripts?.build) process.exit(2)"
+          if node -e "process.exit(require('./package.json').scripts?.test ? 0 : 1)"; then
+            npm test
+          else
+            echo "No test script declared; continuing with production build."
+          fi
+          npm run build
+          test -s dist/index.html
+          echo "GLB asset count: $(find public/assets/3d -type f -name '*.glb' | wc -l)"
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install Android SDK packages
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -n 1)"
+          test -n "$SDKMANAGER"
+          set +o pipefail
+          yes | "$SDKMANAGER" --licenses
+          set -o pipefail
+          "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+      - name: Package uploaded source as Android APK
+        run: |
+          set -euo pipefail
+          cd "$SOURCE_DIR"
+          npm install @capacitor/core @capacitor/cli @capacitor/android
+          npx cap init "IRON FRONT 0.15 Wide Map" "com.yarubdoktor.ironfront015" --web-dir dist
+          npx cap add android
+          npx cap sync android
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+          APK="$SOURCE_DIR/android/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          mkdir -p "$RUNNER_TEMP/iron-front-output"
+          cp "$APK" "$RUNNER_TEMP/iron-front-output/IRON-FRONT-0.15-WIDE-MAP-TEST.apk"
+          cd "$SOURCE_DIR"
+          zip -qr "$RUNNER_TEMP/iron-front-output/IRON-FRONT-0.15-WIDE-MAP-SOURCE-BUILT.zip" . -x 'node_modules/*' 'dist/*' 'android/*'
+      - name: Upload 0.15 Wide Map APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: IRON-FRONT-0.15-WIDE-MAP-APK
+          path: ${{ runner.temp }}/iron-front-output/IRON-FRONT-0.15-WIDE-MAP-TEST.apk
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload 0.15 Wide Map source package
+        uses: actions/upload-artifact@v4
+        with:
+          name: IRON-FRONT-0.15-WIDE-MAP-BUILT-SOURCE
+          path: ${{ runner.temp }}/iron-front-output/IRON-FRONT-0.15-WIDE-MAP-SOURCE-BUILT.zip
+          if-no-files-found: error
+          retention-days: 14
