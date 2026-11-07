@@ -1,0 +1,81 @@
+name: Build SkyStrike v26.3.5-M4 Android APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'SkyStrike-v26_3_5-M4.zip'
+      - '.github/workflows/build-skystrike-v26-3-5-m4.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Verify and extract M4 source archive
+        run: |
+          set -euo pipefail
+          test -s "SkyStrike-v26_3_5-M4.zip"
+          sha256sum "SkyStrike-v26_3_5-M4.zip"
+          unzip -t "SkyStrike-v26_3_5-M4.zip"
+          mkdir -p /tmp/skystrike-source
+          unzip -q "SkyStrike-v26_3_5-M4.zip" -d /tmp/skystrike-source
+          PROJECT_DIR="$(find /tmp/skystrike-source -type f -name package.json -print -quit | xargs -r dirname)"
+          if [[ -z "$PROJECT_DIR" || ! -s "$PROJECT_DIR/package.json" ]]; then
+            echo "ERROR: package.json not found in M4 archive"
+            find /tmp/skystrike-source -maxdepth 5 -type f | head -200
+            exit 1
+          fi
+          echo "Detected project: $PROJECT_DIR"
+          cat "$PROJECT_DIR/package.json"
+          mkdir -p "$GITHUB_WORKSPACE/skystrike-build"
+          cp -a "$PROJECT_DIR"/. "$GITHUB_WORKSPACE/skystrike-build"/
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: skystrike-build/package-lock.json
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install dependencies and build web assets
+        working-directory: skystrike-build
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run build
+      - name: Verify Capacitor configuration and web output
+        working-directory: skystrike-build
+        run: |
+          set -euo pipefail
+          test -f capacitor.config.json -o -f capacitor.config.ts -o -f capacitor.config.js
+          WEB_DIR="$(node -e "const c=require('./capacitor.config.json'); process.stdout.write(c.webDir || 'www')")"
+          test -d "$WEB_DIR" || { echo "ERROR: Capacitor webDir '$WEB_DIR' was not generated"; find . -maxdepth 3 -type f | head -200; exit 1; }
+      - name: Generate Android project
+        working-directory: skystrike-build
+        run: |
+          set -euo pipefail
+          npx cap add android
+      - name: Sync and build APK
+        working-directory: skystrike-build
+        run: |
+          set -euo pipefail
+          npx cap sync android
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SkyStrike-v26_3_5-M4-debug-APK
+          path: skystrike-build/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
