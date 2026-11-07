@@ -1,0 +1,73 @@
+name: Build SkyStrike v26.3.1-M0 Android APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'SkyStrike-v26_3_1-M0.zip'
+      - '.github/workflows/build-skystrike-v26-3-1-m0.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Verify exact source archive
+        run: |
+          set -euo pipefail
+          test -s "SkyStrike-v26_3_1-M0.zip"
+          sha256sum "SkyStrike-v26_3_1-M0.zip"
+          mkdir -p /tmp/skystrike-source
+          unzip -q "SkyStrike-v26_3_1-M0.zip" -d /tmp/skystrike-source
+          PROJECT_DIR="$(find /tmp/skystrike-source -type f -name package.json -print -quit | xargs -r dirname)"
+          if [[ -z "$PROJECT_DIR" || ! -s "$PROJECT_DIR/package.json" ]]; then
+            echo "ERROR: package.json not found in source ZIP"
+            find /tmp/skystrike-source -maxdepth 4 -type f | head -150
+            exit 1
+          fi
+          mkdir -p "$GITHUB_WORKSPACE/skystrike-build"
+          cp -a "$PROJECT_DIR"/. "$GITHUB_WORKSPACE/skystrike-build"/
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install dependencies and build web assets
+        working-directory: skystrike-build
+        run: |
+          set -euo pipefail
+          npm install
+          npm run build
+      - name: Generate Android project
+        working-directory: skystrike-build
+        run: |
+          set -euo pipefail
+          if [[ ! -f capacitor.config.json && ! -f capacitor.config.ts && ! -f capacitor.config.js ]]; then
+            echo "ERROR: No Capacitor configuration found"
+            exit 1
+          fi
+          npx cap add android
+      - name: Sync and build APK
+        working-directory: skystrike-build
+        run: |
+          set -euo pipefail
+          npx cap sync android
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SkyStrike-v26_3_1-M0-debug-APK
+          path: skystrike-build/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
